@@ -36,6 +36,7 @@ class IOptronV3 : public INDI::Telescope, public INDI::GuiderInterface
 
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
         virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
+        virtual bool ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n) override;
 
     protected:
         virtual const char *getDefaultName() override;
@@ -104,13 +105,26 @@ class IOptronV3 : public INDI::Telescope, public INDI::GuiderInterface
         bool GetPECDataStatus(bool enabled);
         
         /* Mod v3.0 Adding PEC Recording Switches  */
-        ISwitch PECTrainingS[2]; 
+        
         ISwitchVectorProperty PECTrainingSP; 
         ITextVectorProperty PECInfoTP;
-        IText PECInfoT[2] {};
+        ITextVectorProperty PECFileTP;
+        INumberVectorProperty PECTimingNP;
+        ISwitch PECTrainingS[2]; 
+        IText PECInfoT[1] {};
+        IText PECFileT[3] {};
+        INumber PECTimingN[3] {};
+        
         char PECText[128];
-        int PECTime = 0;
-        bool isTraining;
+        char PECFullPath[256];
+        float* PECvalues;
+        tm PECStart_tm;
+        std::time_t PECStartTime;
+        std::ifstream PECfile;
+        int PECIndex = 0;
+        bool isTraining = false;
+        bool isWaitingTraining = false;
+        float appliedCorrection = 0;
         // End Mod */
 
         /* Firmware */

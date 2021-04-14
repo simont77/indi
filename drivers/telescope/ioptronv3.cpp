@@ -36,7 +36,7 @@
 using namespace IOPv3;
 
 #define MOUNTINFO_TAB "Mount Info"
-// #define PEC_TAB "PEC"  //Not Needed
+#define PEC_TAB "PEC training"  
 
 // We declare an auto pointer to IOptronV3.
 static std::unique_ptr<IOptronV3> scope(new IOptronV3());
@@ -176,14 +176,26 @@ bool IOptronV3::initProperties()
     // PEC Training
     IUFillSwitch(&PECTrainingS[0], "PEC_Recording", "Record", ISS_OFF);
     IUFillSwitch(&PECTrainingS[1], "PEC_Status", "Status", ISS_OFF);
-    IUFillSwitchVector(&PECTrainingSP, PECTrainingS, 2, getDeviceName(), "PEC_TRAINING", "Training", MOTION_TAB, IP_RW,
+    IUFillSwitchVector(&PECTrainingSP, PECTrainingS, 2, getDeviceName(), "PEC_TRAINING", "PEC Training", PEC_TAB, IP_RW,
                        ISR_1OFMANY, 0,
                        IPS_IDLE);
 
     // Create PEC Training Information */
     IUFillText(&PECInfoT[0], "PEC_INFO", "Status", "");
-    IUFillTextVector(&PECInfoTP, PECInfoT, 1, getDeviceName(), "PEC_INFOS", "Data", MOTION_TAB,
+    IUFillTextVector(&PECInfoTP, PECInfoT, 1, getDeviceName(), "PEC_INFOS", "PEC Status", PEC_TAB,
                      IP_RO, 60, IPS_IDLE);
+
+    IUFillText(&PECFileT[0], "PEC_FILE_PATH", "Path", getenv("HOME"));
+    IUFillText(&PECFileT[1], "PEC_FILE_NAME", "Name", "pec.txt");
+    IUFillText(&PECFileT[2], "PEC_FILE_TIME", "Time(YYYY-MM-DD hh:mm:ss)", "");
+    IUFillTextVector(&PECFileTP, PECFileT, 3, getDeviceName(), "PEC_FILE", "PEC file", PEC_TAB,
+                     IP_RW, 60, IPS_IDLE);
+
+    IUFillNumber(&PECTimingN[0], "PEC_PERIOD", "Period (s)", "%g", 0, 1000, 1, 400);
+    IUFillNumber(&PECTimingN[1], "PEC_DEPHASE", "Dephase (s)", "%g", 0, 1000, 1, 0);
+    IUFillNumber(&PECTimingN[2], "PEC_MINSTEP", "Minimum pulse (ms)", "%g", 0, 1000, 1, 10);
+    IUFillNumberVector(&PECTimingNP, PECTimingN, 3, getDeviceName(), "PEC_TIMING", "PEC Timing", PEC_TAB, IP_RW, 0,
+                       IPS_IDLE);
     // End Mod */
 
     /* How fast do we guide compared to sidereal rate */
@@ -257,6 +269,8 @@ bool IOptronV3::updateProperties()
         /* v3.0 Create PEC switches */
         defineProperty(&PECTrainingSP);
         defineProperty(&PECInfoTP);
+        defineProperty(&PECFileTP);
+        defineProperty(&PECTimingNP);
         // End Mod */
 
         defineProperty(&GuideNSNP);
@@ -280,6 +294,8 @@ bool IOptronV3::updateProperties()
         /* v3.0 Delete PEC switches */
         deleteProperty(PECTrainingSP.name);
         deleteProperty(PECInfoTP.name);
+        deleteProperty(PECFileTP.name);
+        deleteProperty(PECTimingNP.name);
         // End Mod*/
 
         deleteProperty(GuideNSNP.name);
@@ -439,6 +455,69 @@ void IOptronV3::getStartupData()
     }
 }
 
+bool IOptronV3::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
+{
+    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
+    {
+        // PEC file
+        if (!strcmp(name, PECFileTP.name))
+        {
+            snprintf(PECFullPath,256,"%s/%s",texts[0],texts[1]);
+            
+
+            int day, month, year, hour, min, sec;
+            sscanf(texts[2],"%4d-%2d-%2d %2d:%2d:%2d",&year,&month,&day,&hour,&min,&sec);
+            PECStart_tm.tm_year = year - 1900;
+            PECStart_tm.tm_mon = month - 1;
+            PECStart_tm.tm_mday = day;
+            PECStart_tm.tm_hour = hour;
+            PECStart_tm.tm_min = min;
+            PECStart_tm.tm_sec = sec;
+            PECStart_tm.tm_isdst = -1;
+            PECStartTime = mktime(&PECStart_tm);
+
+            char temp_string[64];
+            snprintf(temp_string,64,"PEC file path: %s",PECFullPath);
+            LOG_INFO(temp_string);
+            
+            snprintf(temp_string,64,"Acquisition time: %s",asctime(&PECStart_tm));
+            LOG_INFO(temp_string);
+
+
+            if ((int)(PECTimingN[1].value) !=0)
+            {
+                PECStart_tm.tm_sec += PECTimingN[1].value;
+                PECStartTime = mktime(&PECStart_tm);
+                snprintf(temp_string,64,"Acquisition time dephased: %s",asctime(&PECStart_tm));
+                LOG_INFO(temp_string);           
+            }
+
+            time_t actual_time;
+            time(&actual_time);
+            snprintf(temp_string,64,"Actual time: %s",ctime(&actual_time));
+            LOG_INFO(temp_string);     
+
+            int nextPeriodDelta;
+            nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
+                                        difftime(actual_time, PECStartTime));
+            snprintf(temp_string,50,"Time to next period start: %ds",nextPeriodDelta);
+            LOG_INFO(temp_string);
+
+            snprintf(texts[2],MAXINDILABEL,"%s",asctime(&PECStart_tm));
+            
+            IUUpdateText(&PECFileTP, texts, names, n);
+            PECFileTP.s = IPS_OK;
+            IDSetText(&PECFileTP, nullptr);
+
+            return true;
+        }
+    }
+
+    return INDI::Telescope::ISNewText(dev, name, texts, names, n);
+}
+
+
+
 bool IOptronV3::ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n)
 {
     if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
@@ -455,6 +534,15 @@ bool IOptronV3::ISNewNumber(const char *dev, const char *name, double values[], 
 
             IDSetNumber(&GuideRateNP, nullptr);
 
+            return true;
+        }
+
+        if (!strcmp(name, PECTimingNP.name))
+        {
+            IUUpdateNumber(&PECTimingNP, values, names, n);
+            PECTimingNP.s = IPS_OK;
+            PECFileTP.s = IPS_ALERT;
+            IDSetNumber(&PECTimingNP, nullptr);
             return true;
         }
 
@@ -576,7 +664,7 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
             if(isTraining)
             {
                 // Training check
-                sprintf(PECText, "Mount PEC busy recording, %d s", PECTime);
+                sprintf(PECText, "Mount PEC busy recording index %d", PECIndex);
                 LOG_WARN(PECText);
             }
             else
@@ -607,13 +695,13 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
     if (!strcmp(name, PECTrainingSP.name))
     {
         IUUpdateSwitch(&PECTrainingSP, states, names, n);
-        if(isTraining)
+        if (isTraining || isWaitingTraining)
         {
             // Check if already training
             if(IUFindOnSwitchIndex(&PECTrainingSP) == 1)
             {
                 // Train Check Status
-                sprintf(PECText, "Mount PEC busy recording, %d s", PECTime);
+                sprintf(PECText, "Mount PEC busy recording index %d", PECIndex);
                 LOG_WARN(PECText);
             }
 
@@ -621,7 +709,9 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
             {
                 // Train Cancel
                 driver->setPETEnabled(false);
+                delete[] PECvalues;
                 isTraining = false;
+                isWaitingTraining = false;
                 PECTrainingSP.s = IPS_ALERT;
                 LOG_WARN("PEC Training cancelled by user, chip disabled");
             }
@@ -633,11 +723,43 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
                 if(TrackState == SCOPE_TRACKING)
                 {
                     // Train if tracking /guiding
-                    driver->setPETEnabled(true);
-                    isTraining = true;
-                    PECTime = 0;
+                    PECfile.open(PECFullPath);
+                    std::string str; 
+
+                    std::getline(PECfile, str);
+                   
+                    std::getline(PECfile, str);
+                    
+                    std::getline(PECfile, str);
+                    
+                    std::getline(PECfile, str);
+                    
+                    std::getline(PECfile, str);
+                    
+                    PECvalues = new float[(int)PECTimingN[0].value];
+
+                    for (int i=0; i<PECTimingN[0].value; i++)
+                    {
+                        std::getline(PECfile, str);
+                        PECvalues[i] = std::stof(str.substr(str.find_last_of(" ")));
+                        LOG_INFO(std::to_string(PECvalues[i]).c_str());
+                    }
+                    
+                    PECfile.close();
+
+                    isWaitingTraining = true;
+
+                    
                     PECTrainingSP.s = IPS_BUSY;
-                    LOG_INFO("PEC recording started...");
+                    int nextPeriodDelta;
+                    char temp_string[64];
+                    time_t actual_time;
+                    time(&actual_time);
+                    nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
+                                        difftime(actual_time, PECStartTime));
+                    snprintf(temp_string,50,"PEC recording started, time to next period: %ds",nextPeriodDelta);
+                    LOG_INFO(temp_string);
+                    
                 }
                 else
                 {
@@ -774,15 +896,47 @@ bool IOptronV3::ReadScopeStatus()
         {
             if(GetPECDataStatus(false))
             {
-                sprintf(PECText, "%d second worm cycle recorded", PECTime);
+                sprintf(PECText, "Mount PEC busy recording index %d", PECIndex);
                 LOG_INFO(PECText);
+                delete[] PECvalues;
                 PECTrainingSP.s = IPS_OK;
                 isTraining = false;
             }
             else
             {
-                PECTime = PECTime + 1 * getCurrentPollingPeriod() / 1000;
-                sprintf(PECText, "Recording: %d s", PECTime);
+                char temp_str[128];
+                time_t actual_time;
+  
+                time(&actual_time);
+                int nextPeriodDelta;
+                nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
+                                        difftime(actual_time, PECStartTime));
+
+                PECIndex = PECTimingN[0].value-nextPeriodDelta + PECTimingN[1].value;
+
+                if (PECIndex>=PECTimingN[0].value)
+                    PECIndex = PECIndex - PECTimingN[0].value;
+
+                float deltaPE, newCorrection;
+
+                deltaPE= PECvalues[PECIndex]-appliedCorrection;
+                newCorrection = deltaPE/(TRACKRATE_SIDEREAL*GuideRateN[0].value);
+                if (newCorrection> (PECTimingN[2].value / 1000) || newCorrection<-(PECTimingN[2].value / 1000))
+                {
+                    //apply guiding here
+                    if (newCorrection > 0)
+                        GuideWest(newCorrection*1000);
+                    else
+                        GuideEast(newCorrection*1000);
+
+                    appliedCorrection += deltaPE;
+                }
+
+                sprintf(temp_str, "Time: %d, delta: %4f, correction: %4f, total corr: %4f, error: %4f",
+                             PECIndex, deltaPE, newCorrection, appliedCorrection, PECvalues[PECIndex]-appliedCorrection);
+                LOG_INFO(temp_str);
+
+                sprintf(PECText, "Recording index %d", PECIndex);
                 IUSaveText(&PECInfoT[0], PECText);
             }
         }
@@ -790,7 +944,54 @@ bool IOptronV3::ReadScopeStatus()
         {
             driver->setPETEnabled(false);
             PECTrainingSP.s = IPS_ALERT;
-            sprintf(PECText, "Tracking error, recording cancelled %d s", PECTime);
+            sprintf(PECText, "Tracking error, recording cancelled at index %d", PECIndex);
+            delete[] PECvalues;
+            LOG_ERROR(PECText);
+            IUSaveText(&PECInfoT[0], "Cancelled");
+        }
+        IDSetText(&PECInfoTP, nullptr);
+        IDSetSwitch(&PECTrainingSP, nullptr);
+    }
+    
+    if (isWaitingTraining)
+    {
+        if (TrackState == SCOPE_TRACKING)
+        {
+            time_t actual_time;
+  
+            time(&actual_time);
+            
+
+            int nextPeriodDelta;
+            nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
+                                        difftime(actual_time, PECStartTime));
+
+            if (nextPeriodDelta == PECTimingN[0].value)
+            {
+                driver->setPETEnabled(true);
+                isWaitingTraining = false;
+                isTraining = true;
+                LOG_INFO("Recording started.");
+                PECIndex = PECTimingN[1].value;;
+                appliedCorrection = 0;
+                sprintf(PECText, "Recording index %d", PECIndex);
+                IUSaveText(&PECInfoT[0], PECText);
+            }
+            else
+            {
+                sprintf(PECText, "Time to start recording: %d s", nextPeriodDelta);
+                IUSaveText(&PECInfoT[0], PECText);
+            }
+            
+        }
+        else
+        {
+            driver->setPETEnabled(false);
+            PECTrainingSP.s = IPS_ALERT;
+            sprintf(PECText, "Tracking error, recording cancelled at index %d", PECIndex);
+            delete[] PECvalues;
+            isWaitingTraining = false;
+            isTraining = false;
             LOG_ERROR(PECText);
             IUSaveText(&PECInfoT[0], "Cancelled");
         }
