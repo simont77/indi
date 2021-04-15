@@ -880,7 +880,7 @@ bool IOptronV3::ReadScopeStatus()
         {
             if(GetPECDataStatus(false))
             {
-                sprintf(PECText, "PEC with %d second worm cycle recorded", (int)(PECTimingN[0],value));
+                sprintf(PECText, "PEC with %d second worm cycle recorded", (int)(PECTimingN[0].value));
                 LOG_INFO(PECText);
                 delete[] PECvalues;
                 PECTrainingSP.s = IPS_OK;
@@ -901,23 +901,28 @@ bool IOptronV3::ReadScopeStatus()
                 if (PECIndex>=PECTimingN[0].value)
                     PECIndex = PECIndex - PECTimingN[0].value;
 
-                float deltaPE, newCorrection;
+                float deltaPE;
+                int guidePulse;
 
                 deltaPE= PECvalues[PECIndex]-appliedCorrection;
-                newCorrection = deltaPE/(TRACKRATE_SIDEREAL*GuideRateN[0].value);
-                if (newCorrection> (PECTimingN[2].value / 1000) || newCorrection<-(PECTimingN[2].value / 1000))
+                guidePulse = (int)floor((deltaPE/(TRACKRATE_SIDEREAL*GuideRateN[0].value))*1000 + 0.5);   //round to ms
+                if (guidePulse > (PECTimingN[2].value) || guidePulse<-(PECTimingN[2].value))
                 {
                     //apply guiding here
-                    if (newCorrection > 0)
-                        GuideWest(newCorrection*1000);
+                    if (guidePulse > 0)
+                        GuideWest((int)(guidePulse));
                     else
-                        GuideEast(newCorrection*1000);
+                        GuideEast((int)(-guidePulse));
 
-                    appliedCorrection += deltaPE;
+                    appliedCorrection += (guidePulse/1000.0) * (TRACKRATE_SIDEREAL*GuideRateN[0].value);
+                }
+                else
+                {
+                    guidePulse = 0;
                 }
 
-                sprintf(temp_str, "Time: %d, delta: %4f, correction: %4f, total corr: %4f, error: %4f",
-                             PECIndex, deltaPE, newCorrection, appliedCorrection, PECvalues[PECIndex]-appliedCorrection);
+                sprintf(temp_str, "Index: %d, delta: %.4f, pulse: %d, total corr: %.4f, error: %.4f",
+                             PECIndex, deltaPE, guidePulse, appliedCorrection, PECvalues[PECIndex]-appliedCorrection);
                 LOG_INFO(temp_str);
 
                 sprintf(PECText, "Recording index %d", PECIndex);
@@ -1271,7 +1276,6 @@ bool IOptronV3::saveConfigItems(FILE *fp)
 
     IUSaveConfigSwitch(fp, &SlewModeSP);
     IUSaveConfigSwitch(fp, &DaylightSP);
-    IUSaveConfigText(fp, &PECFileTP);
 
     return true;
 }
