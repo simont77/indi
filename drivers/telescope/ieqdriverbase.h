@@ -184,6 +184,11 @@ class Base
         virtual bool setCustomRATrackRate(double rate);
         virtual bool setTrackMode(TrackRate rate);
         virtual bool setTrackEnabled(bool enabled);
+        /* v3.0 Add in PEC Control */
+        bool setPECEnabled(bool enabled); // start / stop PEC
+        bool setPETEnabled(bool enabled); // record / cancel PEC
+        bool getPETEnabled(bool enabled); // not supported on current firmware
+        // End Mod */
         virtual bool abort();
         virtual bool slew();
         virtual bool sync();

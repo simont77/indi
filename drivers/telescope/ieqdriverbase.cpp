@@ -323,6 +323,40 @@ bool Base::startGuide(Direction dir, uint32_t ms)
     return sendCommand(cmd);
 }
 
+/* v3.0 Added in control for PEC , Train and Data Integrity */
+bool Base::setPECEnabled(bool enabled)  
+{ 
+    return sendCommand(enabled ? ":SPP1#" : ":SPP0#");
+}
+
+bool Base::setPETEnabled(bool enabled)
+{
+    return sendCommand(enabled ? ":SPR1#" : ":SPR0#");
+}
+
+bool Base::getPETEnabled(bool enabled)
+{
+    char res[DRIVER_LEN] = {0};
+    //  If enabled true then check data quality -> :GPE#
+    //  If enabled false then check if training -> :GPR#
+    if(enabled)
+    {
+        if (sendCommand(":GPE#",res))
+         {
+            if (res[0] == '1'){return true;}
+         }
+    }
+    else
+    {
+         if (sendCommand(":GPR#",res))
+         {
+            if (res[0] == '1'){return true;}
+         } 
+    }      
+    return false;
+}
+// End Mod */
+
 bool Base::park()
 {
     if (!isCommandSupported("MP1"))
