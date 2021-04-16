@@ -825,6 +825,7 @@ bool IEQPro::ReadScopeStatus()
             {
                 sprintf(PECText, "PEC with %d second worm cycle recorded", (int)(PECTimingN[0].value));
                 LOG_INFO(PECText);
+                IUSaveText(&PECInfoT[0], PECText);
                 delete[] PECvalues;
                 PECTrainingSP.s = IPS_OK;
                 isTraining = false;
