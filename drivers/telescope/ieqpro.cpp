@@ -413,13 +413,13 @@ void IEQPro::getStartupData()
     }
     // End Mod */
 
-    //    if (isSimulation())
-    //    {
-    //        if (isParked())
-    //            set_sim_system_status(ST_PARKED);
-    //        else
-    //            set_sim_system_status(ST_STOPPED);
-    //    }
+    if (isSimulation())
+    {
+        if (isParked())
+            driver->setSimSytemStatus(ST_PARKED);
+        else
+            driver->setSimSytemStatus(ST_STOPPED);
+    }
 }
 
 bool IEQPro::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
@@ -711,8 +711,8 @@ bool IEQPro::ReadScopeStatus()
 {
     iEQ::Base::Info newInfo;
 
-    //    if (isSimulation())
-    //        mountSim();
+    if (isSimulation())
+        mountSim();
 
     bool rc = driver->getStatus(&newInfo);
 
@@ -1138,15 +1138,7 @@ bool IEQPro::UnPark()
 
 bool IEQPro::Handshake()
 {
-    //    if (isSimulation())
-    //    {
-    //        set_sim_gps_status(GPS_DATA_OK);
-    //        set_sim_system_status(ST_STOPPED);
-    //        set_sim_track_rate(TR_SIDEREAL);
-    //        set_sim_slew_rate(SR_3);
-    //        set_sim_time_source(TS_GPS);
-    //        set_sim_hemisphere(HEMI_NORTH);
-    //    }
+    driver->setSimulation(isSimulation());
 
     if (driver->initCommunication(PortFD) == false)
         return false;
@@ -1228,8 +1220,7 @@ void IEQPro::debugTriggered(bool enable)
 
 void IEQPro::simulationTriggered(bool enable)
 {
-    INDI_UNUSED(enable);
-    //driver->setSi(enable);
+    driver->setSimulation(enable);
 }
 
 bool IEQPro::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
@@ -1337,93 +1328,93 @@ bool IEQPro::saveConfigItems(FILE *fp)
     return true;
 }
 
-//void IEQPro::mountSim()
-//{
-//    static struct timeval ltv;
-//    struct timeval tv;
-//    double dt, da, dx;
-//    int nlocked;
+void IEQPro::mountSim()
+{
+   static struct timeval ltv;
+   struct timeval tv;
+   double dt, da, dx;
+   int nlocked;
 
-//    /* update elapsed time since last poll, don't presume exactly POLLMS */
-//    gettimeofday(&tv, nullptr);
+   /* update elapsed time since last poll, don't presume exactly POLLMS */
+   gettimeofday(&tv, nullptr);
 
-//    if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
-//        ltv = tv;
+   if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
+       ltv = tv;
 
-//    dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
-//    ltv = tv;
-//    da  = SLEWRATE * dt;
+   dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
+   ltv = tv;
+   da  = SLEWRATE * dt;
 
-//    /* Process per current state. We check the state of EQUATORIAL_COORDS and act acoordingly */
-//    switch (TrackState)
-//    {
-//        case SCOPE_IDLE:
-//            currentRA += (TrackRateN[AXIS_RA].value / 3600.0 * dt) / 15.0;
-//            currentRA = range24(currentRA);
-//            break;
+   /* Process per current state. We check the state of EQUATORIAL_COORDS and act acoordingly */
+   switch (TrackState)
+   {
+       case SCOPE_IDLE:
+           currentRA += (TrackRateN[AXIS_RA].value / 3600.0 * dt) / 15.0;
+           currentRA = range24(currentRA);
+           break;
 
-//        case SCOPE_TRACKING:
-//            if (TrackModeS[1].s == ISS_ON)
-//            {
-//                currentRA  += ( ((TRACKRATE_SIDEREAL / 3600.0) - (TrackRateN[AXIS_RA].value / 3600.0)) * dt) / 15.0;
-//                currentDEC += ( (TrackRateN[AXIS_DE].value / 3600.0) * dt);
-//            }
-//            break;
+       case SCOPE_TRACKING:
+           if (TrackModeS[1].s == ISS_ON)
+           {
+               currentRA  += ( ((TRACKRATE_SIDEREAL / 3600.0) - (TrackRateN[AXIS_RA].value / 3600.0)) * dt) / 15.0;
+               currentDEC += ( (TrackRateN[AXIS_DE].value / 3600.0) * dt);
+           }
+           break;
 
-//        case SCOPE_SLEWING:
-//        case SCOPE_PARKING:
-//            /* slewing - nail it when both within one pulse @ SLEWRATE */
-//            nlocked = 0;
+       case SCOPE_SLEWING:
+       case SCOPE_PARKING:
+           /* slewing - nail it when both within one pulse @ SLEWRATE */
+           nlocked = 0;
 
-//            dx = targetRA - currentRA;
+           dx = targetRA - currentRA;
 
-//            // Take shortest path
-//            if (fabs(dx) > 12)
-//                dx *= -1;
+           // Take shortest path
+           if (fabs(dx) > 12)
+               dx *= -1;
 
-//            if (fabs(dx) <= da)
-//            {
-//                currentRA = targetRA;
-//                nlocked++;
-//            }
-//            else if (dx > 0)
-//                currentRA += da / 15.;
-//            else
-//                currentRA -= da / 15.;
+           if (fabs(dx) <= da)
+           {
+               currentRA = targetRA;
+               nlocked++;
+           }
+           else if (dx > 0)
+               currentRA += da / 15.;
+           else
+               currentRA -= da / 15.;
 
-//            if (currentRA < 0)
-//                currentRA += 24;
-//            else if (currentRA > 24)
-//                currentRA -= 24;
+           if (currentRA < 0)
+               currentRA += 24;
+           else if (currentRA > 24)
+               currentRA -= 24;
 
-//            dx = targetDEC - currentDEC;
-//            if (fabs(dx) <= da)
-//            {
-//                currentDEC = targetDEC;
-//                nlocked++;
-//            }
-//            else if (dx > 0)
-//                currentDEC += da;
-//            else
-//                currentDEC -= da;
+           dx = targetDEC - currentDEC;
+           if (fabs(dx) <= da)
+           {
+               currentDEC = targetDEC;
+               nlocked++;
+           }
+           else if (dx > 0)
+               currentDEC += da;
+           else
+               currentDEC -= da;
 
-//            if (nlocked == 2)
-//            {
-//                if (TrackState == SCOPE_SLEWING)
-//                    set_sim_system_status(ST_TRACKING_PEC_OFF);
-//                else
-//                    set_sim_system_status(ST_PARKED);
-//            }
+           if (nlocked == 2)
+           {
+               if (TrackState == SCOPE_SLEWING)
+                   driver->setSimSytemStatus(ST_TRACKING_PEC_OFF);
+               else
+                   driver->setSimSytemStatus(ST_PARKED);
+           }
 
-//            break;
+           break;
 
-//        default:
-//            break;
-//    }
+       default:
+           break;
+   }
 
-//    set_sim_ra(currentRA);
-//    set_sim_dec(currentDEC);
-//}
+   driver->setSimRA(currentRA);
+   driver->setSimDE(currentDEC);
+}
 
 bool IEQPro::SetCurrentPark()
 {

@@ -74,6 +74,13 @@ bool Base::getModel()
     char res[DRIVER_LEN] = {0};
 
     // Do we support this mount?
+
+    if (m_Simulation)
+    {
+        m_FirmwareInfo.Model = "GEM45";
+        return true;
+    }
+
     if (sendCommand(":MountInfo#", res, -1, 4))
     {
         std::string code = res;
@@ -99,6 +106,13 @@ bool Base::getMainFirmware()
 {
     char res[DRIVER_LEN] = {0};
 
+    if (m_Simulation)
+    {
+        m_FirmwareInfo.MainBoardFirmware = "191018";
+        m_FirmwareInfo.ControllerFirmware = "191018";
+        return true;
+    }
+
     if (sendCommand(":FW1#", res))
     {
         char board[8] = {0}, controller[8] = {0};
@@ -118,6 +132,13 @@ bool Base::getMainFirmware()
 bool Base::getRADEFirmware()
 {
     char res[DRIVER_LEN] = {0};
+
+    if (m_Simulation)
+    {
+        m_FirmwareInfo.RAFirmware = "191018";
+        m_FirmwareInfo.DEFirmware = "191018";
+        return true;
+    }
 
     if (sendCommand(":FW2#", res))
     {
@@ -278,6 +299,13 @@ bool Base::setGuideRate(double raRate, double deRate)
 
 bool Base::getGuideRate(double *raRate, double *deRate)
 {
+    if(m_Simulation)
+    {
+        *raRate = 0.5;
+        *deRate = 0.5;
+        return true;
+    }
+    
     if (!isCommandSupported("AG"))
         return false;
 
@@ -736,6 +764,9 @@ bool Base::sendCommand(const char * cmd, char * res, int cmd_len, int res_len)
 {
     int nbytes_written = 0, nbytes_read = 0, rc = -1;
 
+    if (m_Simulation)
+        return true;
+
     tcflush(m_PortFD, TCIOFLUSH);
 
     if (cmd_len > 0)
@@ -862,5 +893,78 @@ int Base::DecodeString(const char *data, size_t size)
     int iVal = atoi(str);
     return iVal;
 }
+
+void Base::setSimulation(bool enable)
+{
+    m_Simulation = enable;
+
+    simData.ra_guide_rate = 0.5;
+    simData.de_guide_rate = 0.5;
+    simData.pier_state = IEQ_PIER_WEST;
+    simData.JD = ln_get_julian_from_sys();
+    simData.utc_offset_minutes = 3 * 60;
+    simData.day_light_saving = false;
+
+    simData.simInfo.gpsStatus = GPS_DATA_OK;
+    simData.simInfo.hemisphere = HEMI_NORTH;
+    simData.simInfo.slewRate = SR_6;
+    simData.simInfo.timeSource = TS_GPS;
+    simData.simInfo.trackRate = TR_SIDEREAL;
+    simData.simInfo.longitude = 48.1;
+    simData.simInfo.latitude  = 29.5;
+}
+
+void Base::setSimGPSstatus(GPSStatus value)
+{
+    simData.simInfo.gpsStatus = value;
+}
+
+void Base::setSimSytemStatus(SystemStatus value)
+{
+    simData.simInfo.systemStatus = value;
+}
+
+void Base::setSimTrackRate(TrackRate value)
+{
+    simData.simInfo.trackRate = value;
+}
+
+void Base::setSimSlewRate(SlewRate value)
+{
+    simData.simInfo.slewRate = value;
+}
+
+void Base::setSimTimeSource(TimeSource value)
+{
+    simData.simInfo.timeSource = value;
+}
+
+void Base::setSimHemisphere(Hemisphere value)
+{
+    simData.simInfo.hemisphere = value;
+}
+
+void Base::setSimRA(double ra)
+{
+    simData.ra = ra;
+}
+
+void Base::setSimDE(double de)
+{
+    simData.de = de;
+}
+
+void Base::setSimGuideRate(double raRate, double deRate)
+{
+    simData.ra_guide_rate = raRate;
+    simData.de_guide_rate = deRate;
+}
+
+void Base::setSimLongLat(double longitude, double latitude)
+{
+    simData.simInfo.longitude = longitude;
+    simData.simInfo.latitude  = latitude;
+}
+
 
 }

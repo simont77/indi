@@ -229,11 +229,27 @@ class Base
         virtual bool setUTCOffset(double offset_hours);
         virtual bool setDST(bool enabled);
 
+        /**************************************************************************
+         Simulation
+        **************************************************************************/
+        void setSimGPSstatus(GPSStatus value);
+        void setSimSytemStatus(SystemStatus value);
+        void setSimTrackRate(TrackRate value);
+        void setSimSlewRate(SlewRate value);
+        void setSimTimeSource(TimeSource value);
+        void setSimHemisphere(Hemisphere value);
+        void setSimRA(double ra);
+        void setSimDE(double de);
+        void setSimLongLat(double longitude, double latitude);
+        void setSimGuideRate(double raRate, double deRate);
+        void setSimulation(bool enable);
+
     protected:
 
         int m_PortFD {-1};
         std::string m_DeviceName { "iEQ" };
         bool m_IsDebug { false };
+        bool m_Simulation = {false};
         static const uint8_t DRIVER_TIMEOUT { 3 };
         static const uint8_t DRIVER_LEN { 64 };
         static const char DRIVER_STOP_CHAR { '#' };
@@ -258,6 +274,20 @@ class Base
             {"5010", "Cube II AA", "160610"},
             {"5035", "AZ Mount Pro", "170410"},
         };
+
+        struct
+        {
+            double ra;
+            double de;
+            double ra_guide_rate;
+            double de_guide_rate;
+            double JD;
+            int utc_offset_minutes;
+            bool day_light_saving;
+            IEQ_PIER_SIDE pier_state;
+
+            Info simInfo;
+        } simData;
 
         ///
         /// \brief DecodeString converts the string to a double by dividing by the factor

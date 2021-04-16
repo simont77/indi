@@ -80,7 +80,7 @@ class IEQPro : public INDI::Telescope, public INDI::GuiderInterface
         virtual bool SetSlewRate(int index) override;
 
         // Sim
-        //void mountSim();
+        void mountSim();
 
         // Guide
         virtual IPState GuideNorth(uint32_t ms) override;
