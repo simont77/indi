@@ -422,7 +422,7 @@ void IEQPro::getStartupData()
     //    }
 }
 
-bool IOptronV3::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
+bool IEQPro::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
 {
     if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
     {
