@@ -821,7 +821,7 @@ bool IEQPro::ReadScopeStatus()
     {
         if (TrackState == SCOPE_TRACKING)
         {
-            if(elapsed_training > (int)(PECTimingN[0].value) + 10))
+            if(elapsed_training > (int)(PECTimingN[0].value) + 10)
             {
                 sprintf(PECText, "PEC with %d second worm cycle recorded", (int)(PECTimingN[0].value));
                 LOG_INFO(PECText);
