@@ -189,6 +189,11 @@ bool IOptronV3::initProperties()
     IUFillNumber(&PECTimingN[2], "PEC_MINSTEP", "Minimum pulse (ms)", "%g", 0, 1000, 1, 10);
     IUFillNumberVector(&PECTimingNP, PECTimingN, 3, getDeviceName(), "PEC_TIMING", "PEC Timing", PEC_TAB, IP_RW, 0,
                        IPS_IDLE);
+    IUFillSwitch(&PECSideS[0], "PEC_SideWest", "West positive", ISS_OFF);
+    IUFillSwitch(&PECSideS[1], "PEC_SideEast", "East positive", ISS_OFF);
+    IUFillSwitchVector(&PECSideSP, PECSideS, 2, getDeviceName(), "PEC_Side", "Guiding polarity", PEC_TAB, IP_RW,
+                       ISR_1OFMANY, 0,
+                       IPS_IDLE);
 
     /* How fast do we guide compared to sidereal rate */
     IUFillNumber(&GuideRateN[0], "RA_GUIDE_RATE", "x Sidereal", "%g", 0.01, 0.9, 0.1, 0.5);
@@ -262,6 +267,7 @@ bool IOptronV3::updateProperties()
         defineProperty(&PECInfoTP);
         defineProperty(&PECFileTP);
         defineProperty(&PECTimingNP);
+        defineProperty(&PECSideSP);
 
         defineProperty(&GuideNSNP);
         defineProperty(&GuideWENP);
@@ -285,6 +291,7 @@ bool IOptronV3::updateProperties()
         deleteProperty(PECInfoTP.name);
         deleteProperty(PECFileTP.name);
         deleteProperty(PECTimingNP.name);
+        deleteProperty(PECSideSP.name);
 
         deleteProperty(GuideNSNP.name);
         deleteProperty(GuideWENP.name);
@@ -432,6 +439,11 @@ void IOptronV3::getStartupData()
         }
         scopeInfo = newInfo;
     }
+
+    PECSideS[0].s = ISS_ON;
+    PECSideS[1].s = ISS_OFF;
+    PECSideSP.s = IPS_OK;
+    IDSetSwitch(&PECSideSP, nullptr);
 
     if (isSimulation())
     {
@@ -760,6 +772,26 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
             IDSetSwitch(&PECTrainingSP, nullptr);
             return true;
         }
+
+        if (!strcmp(name, PECSideSP.name))
+        {
+            IUUpdateSwitch(&PECSideSP, states, names, n);
+
+            if(IUFindOnSwitchIndex(&PECSideSP) == 0)
+            {
+                // West positive
+                LOG_INFO("Positive guiding is West");
+            }
+
+            if(IUFindOnSwitchIndex(&PECSideSP) == 1)
+            {
+                // East positive
+                LOG_INFO("Positive guiding is East");
+            }
+            PECSideSP.s = IPS_OK;
+            IDSetSwitch(&PECSideSP, nullptr);
+            return true;
+        }
         
     }
     return INDI::Telescope::ISNewSwitch(dev, name, states, names, n);
@@ -910,10 +942,20 @@ bool IOptronV3::ReadScopeStatus()
                 if (guidePulse > (PECTimingN[2].value) || guidePulse<-(PECTimingN[2].value))
                 {
                     //apply guiding here
-                    if (guidePulse > 0)
-                        GuideWest((int)(guidePulse));
+                    if (PECSideS[0].s == ISS_ON)
+                    {
+                        if (guidePulse > 0)
+                            GuideWest((int)(guidePulse));
+                        else
+                            GuideEast((int)(-guidePulse));
+                    }
                     else
-                        GuideEast((int)(-guidePulse));
+                    {
+                         if (guidePulse > 0)
+                            GuideEast((int)(guidePulse));
+                        else
+                            GuideWest((int)(-guidePulse));
+                    }
 
                     appliedCorrection += (guidePulse/1000.0) * (TRACKRATE_SIDEREAL*GuideRateN[0].value);
                 }

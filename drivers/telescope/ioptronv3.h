@@ -106,14 +106,16 @@ class IOptronV3 : public INDI::Telescope, public INDI::GuiderInterface
         
         /* Mod v3.0 Adding PEC Recording Switches  */
         
-        ISwitchVectorProperty PECTrainingSP; 
+        ISwitchVectorProperty PECTrainingSP;         
         ITextVectorProperty PECInfoTP;
         ITextVectorProperty PECFileTP;
         INumberVectorProperty PECTimingNP;
-        ISwitch PECTrainingS[2]; 
+        ISwitchVectorProperty PECSideSP; 
+        ISwitch PECTrainingS[2];     
         IText PECInfoT[1] {};
         IText PECFileT[3] {};
         INumber PECTimingN[3] {};
+        ISwitch PECSideS[2]; 
         
         char PECText[128];
         char PECFullPath[256];
