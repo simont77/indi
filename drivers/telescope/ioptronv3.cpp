@@ -938,8 +938,16 @@ bool IOptronV3::ReadScopeStatus()
                 int guidePulse;
 
                 deltaPE= PECvalues[PECIndex]-appliedCorrection;
-                guidePulse = (int)floor((deltaPE/(TRACKRATE_SIDEREAL*GuideRateN[0].value))*1000 + 0.5);   //round to ms
-                if (guidePulse > (PECTimingN[2].value) || guidePulse<-(PECTimingN[2].value))
+                guidePulse = (int)roundf((deltaPE/(TRACKRATE_SIDEREAL*GuideRateN[0].value))*1000);   //round to ms
+
+                //then round to stepsize
+                if (guidePulse > 0)
+                    guidePulse = (int)floor((guidePulse + 0.5 * PECTimingN[2].value)/PECTimingN[2].value) * PECTimingN[2].value;
+                else
+                    guidePulse = (int)floor((guidePulse - 0.5 * PECTimingN[2].value)/PECTimingN[2].value) * PECTimingN[2].value;
+
+
+                if (guidePulse >= (PECTimingN[2].value) || guidePulse<=-(PECTimingN[2].value))
                 {
                     //apply guiding here
                     if (PECSideS[0].s == ISS_ON)
