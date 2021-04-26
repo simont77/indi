@@ -944,7 +944,7 @@ bool IOptronV3::ReadScopeStatus()
                 if (guidePulse > 0)
                     guidePulse = (int)floor((guidePulse + 0.5 * PECTimingN[2].value)/PECTimingN[2].value) * PECTimingN[2].value;
                 else
-                    guidePulse = (int)floor((guidePulse - 0.5 * PECTimingN[2].value)/PECTimingN[2].value) * PECTimingN[2].value;
+                    guidePulse = (int)ceil((guidePulse - 0.5 * PECTimingN[2].value)/PECTimingN[2].value) * PECTimingN[2].value;
 
 
                 if (guidePulse >= (PECTimingN[2].value) || guidePulse<=-(PECTimingN[2].value))
