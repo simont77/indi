@@ -199,3 +199,4 @@ libindi/config.h
 3rdparty/indi-sx/indi_sx_wheel
 3rdparty/indi-sx/sx_ccd_test
 3rdparty/libinovasdk/make_inovasdk_symlink.cmake
+log_08-37-57.txt
