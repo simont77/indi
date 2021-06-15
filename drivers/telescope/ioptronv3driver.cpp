@@ -492,6 +492,7 @@ bool Driver::getGuideRate(double *RARate, double *DERate)
     return true;
 }
 
+//updated for new version 3.10 command
 bool Driver::startGuide(IOP_DIRECTION dir, uint32_t ms)
 {
     char cmd[IOP_BUFFER] = {0};
@@ -500,23 +501,23 @@ bool Driver::startGuide(IOP_DIRECTION dir, uint32_t ms)
     switch (dir)
     {
         case IOP_N:
-            dir_c = 'n';
+            dir_c = 'E';    //DEC+
             break;
 
         case IOP_S:
-            dir_c = 's';
+            dir_c = 'C';    //DEC-        
             break;
 
         case IOP_W:
-            dir_c = 'w';
+            dir_c = 'Q';    //RA-
             break;
 
         case IOP_E:
-            dir_c = 'e';
+            dir_c = 'S';    //RA+
             break;
     }
 
-    snprintf(cmd, IOP_BUFFER, ":M%c%05d#", dir_c, ms);
+    snprintf(cmd, IOP_BUFFER, ":Z%c%05d#", dir_c, ms);
 
     return sendCommand(cmd, 0);
 }
