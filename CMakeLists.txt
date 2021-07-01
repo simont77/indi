@@ -5,6 +5,9 @@ PROJECT(libindi C CXX)
 # to always look for includes there:
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+# Build Position Independent Code
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/")
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake_modules/")
 include(GNUInstallDirs)
@@ -43,7 +46,7 @@ ENDIF ()
 set(INDI_SOVERSION "1")
 set(CMAKE_INDI_VERSION_MAJOR 1)
 set(CMAKE_INDI_VERSION_MINOR 9)
-set(CMAKE_INDI_VERSION_RELEASE 0)
+set(CMAKE_INDI_VERSION_RELEASE 1)
 set(CMAKE_INDI_VERSION_STRING "${CMAKE_INDI_VERSION_MAJOR}.${CMAKE_INDI_VERSION_MINOR}.${CMAKE_INDI_VERSION_RELEASE}")
 set(INDI_VERSION ${CMAKE_INDI_VERSION_MAJOR}.${CMAKE_INDI_VERSION_MINOR}.${CMAKE_INDI_VERSION_RELEASE})
 
@@ -177,9 +180,11 @@ SET(indiclient_C_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c)
 
 SET(indiclient_CXX_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/libastro.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/basedevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/baseclient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperty.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperties.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertybasic.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertytext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertynumber.cpp
@@ -194,8 +199,7 @@ IF (UNITY_BUILD)
     ENABLE_UNITY_BUILD(indiclient_cxx indiclient_CXX_SRC 10 cpp)
 ENDIF ()
 
-SET(indiclient_C_SRC ${indiclient_C_SRC}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/libastro.cpp
+SET(indiclient_C_SRC ${indiclient_C_SRC}    
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indicom.c)
 
 add_library(indiclient STATIC ${indiclient_C_SRC} ${indiclient_CXX_SRC})
@@ -249,9 +253,11 @@ SET(indiclientqt_C_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c)
 SET(indiclientqt_CXX_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/libastro.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/basedevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/baseclientqt.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperty.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperties.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertybasic.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertytext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertynumber.cpp
@@ -265,8 +271,7 @@ IF (UNITY_BUILD)
     ENABLE_UNITY_BUILD(indiclientqt_cxx indiclientqt_CXX_SRC 10 cpp)
 ENDIF ()
 
-SET(indiclientqt_C_SRC ${indiclientqt_C_SRC}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/libastro.cpp
+SET(indiclientqt_C_SRC ${indiclientqt_C_SRC}    
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indicom.c)
 
 add_library(indiclientqt STATIC ${indiclientqt_C_SRC} ${indiclientqt_CXX_SRC})
@@ -331,7 +336,7 @@ include_directories( ${CFITSIO_INCLUDE_DIR})
 include_directories( ${NOVA_INCLUDE_DIR})
 include_directories( ${USB1_INCLUDE_DIRS})
 include_directories( ${GSL_INCLUDE_DIRS})
-include_directories( ${JPEG_INCLUDE_DIR} )
+include_directories( ${JPEG_INCLUDE_DIR})
 IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
     include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/webcam)
 ENDIF (${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
@@ -422,9 +427,11 @@ SET(indidriver_C_SRC
     )
 
 SET(indidriver_CXX_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/libastro.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/basedevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/defaultdevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperty.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperties.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertybasic.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertytext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertynumber.cpp
@@ -442,6 +449,7 @@ SET(indidriver_CXX_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indicorrelator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indidetector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indispectrograph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indireceiver.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/inditelescope.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifilterwheel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifocuserinterface.cpp
@@ -468,7 +476,7 @@ SET(indidriver_CXX_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/dsp/dspinterface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/dsp/transforms.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/dsp/convolution.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/pid/pid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/pid/pid.cpp    
     )
 
 IF (UNITY_BUILD)
@@ -479,8 +487,7 @@ ENDIF ()
 SET(indidriver_C_SRC
     ${indidriver_C_SRC}
     ${libdsp_C_SRC}
-    ${fpack_C_SRC}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/libastro.cpp
+    ${fpack_C_SRC}    
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indicom.c)
 
 ##################################################
@@ -754,6 +761,16 @@ target_link_libraries(indi_paramount_telescope indidriver)
 
 install(TARGETS indi_paramount_telescope RUNTIME DESTINATION bin)
 
+########### Astrotrac ##########
+SET(astrotrac_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/telescope/astrotrac.cpp)
+
+add_executable(indi_astrotrac_telescope ${astrotrac_SRC})
+
+target_link_libraries(indi_astrotrac_telescope indidriver AlignmentDriver)
+
+install(TARGETS indi_astrotrac_telescope RUNTIME DESTINATION bin)
+
 #################################################################################
 
 ########### Syncscan ###############
@@ -867,15 +884,6 @@ SET(telescopescript_SRC
 add_executable(indi_script_telescope ${telescopescript_SRC})
 target_link_libraries(indi_script_telescope indidriver)
 install(TARGETS indi_script_telescope RUNTIME DESTINATION bin)
-
-################ Detector Simulator ################
-
-SET(spectrographsimulator_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/spectrograph/spectrograph_simulator.cpp)
-
-add_executable(indi_simulator_spectrograph ${spectrographsimulator_SRC})
-target_link_libraries(indi_simulator_spectrograph indidriver)
-install(TARGETS indi_simulator_spectrograph RUNTIME DESTINATION bin)
 
 ########### CCD Simulator ##############
 SET(ccdsimulator_SRC
@@ -1225,11 +1233,6 @@ add_executable(indi_lacerta_mfoc_focus ${lacerta_mfoc_SRC})
 target_link_libraries(indi_lacerta_mfoc_focus indidriver)
 install(TARGETS indi_lacerta_mfoc_focus RUNTIME DESTINATION bin)
 
-#### UDEV Rules File for Focusers ####
-#### One rule for for all INDI standard focusers ####
-IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/focuser/99-focusers.rules DESTINATION ${UDEVRULES_INSTALL_DIR})
-ENDIF ()
 #################################################################################
 
 #####################################
@@ -1388,6 +1391,32 @@ install(TARGETS indi_qhycfw3_wheel RUNTIME DESTINATION bin)
 #################################################################################
 
 #####################################
+########## SENSORS GROUP ############
+#####################################
+
+################ Receiver Simulator ################
+
+SET(receiversimulator_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/receiver/receiver_simulator.cpp)
+
+add_executable(indi_simulator_receiver ${receiversimulator_SRC})
+target_link_libraries(indi_simulator_receiver indidriver)
+install(TARGETS indi_simulator_receiver RUNTIME DESTINATION bin)
+
+################# RTL-SDR Receiver #################
+find_package(RTLSDR)
+if (RTLSDR_FOUND)
+include_directories( ${RTLSDR_INCLUDE_DIR})
+SET(rtlsdr_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/receiver/indi_rtlsdr.cpp)
+
+add_executable(indi_rtlsdr ${rtlsdr_SRC})
+target_link_libraries(indi_rtlsdr indidriver ${RTLSDR_LIBRARIES})
+install(TARGETS indi_rtlsdr RUNTIME DESTINATION bin)
+endif()
+#################################################################################
+
+#####################################
 ########## DOME GROUP ############
 #####################################
 
@@ -1441,11 +1470,12 @@ install(TARGETS indi_rigel_dome RUNTIME DESTINATION bin)
 set(scopedome_SRCS
         ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dome/scopedome_dome.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dome/scopedome_usb21.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dome/scopedome_arduino.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/drivers/dome/scopedome_sim.cpp
    )
 
 add_executable(indi_scopedome_dome ${scopedome_SRCS})
-target_link_libraries(indi_scopedome_dome indidriver)
+target_link_libraries(indi_scopedome_dome indidriver ${CURL_LIBRARIES})
 install(TARGETS indi_scopedome_dome RUNTIME DESTINATION bin )
 
 ################ Technical Innovations DDW Dome ################
@@ -1554,7 +1584,22 @@ SET(pegasus_upb_SRC
 add_executable(indi_pegasus_upb ${pegasus_upb_SRC})
 target_link_libraries(indi_pegasus_upb indidriver)
 install(TARGETS indi_pegasus_upb RUNTIME DESTINATION bin)
+########### Pegasus USB Control Hub  ###############
 
+SET(pegasus_uch_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/pegasus_uch.cpp)
+
+add_executable(indi_pegasus_uch ${pegasus_uch_SRC})
+target_link_libraries(indi_pegasus_uch indidriver)
+install(TARGETS indi_pegasus_uch RUNTIME DESTINATION bin)
+########### Pegasus FlatMaster ###############
+
+SET(pegasus_fm_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/pegasus_flatmaster.cpp)
+
+add_executable(indi_pegasus_flatmaster ${pegasus_fm_SRC})
+target_link_libraries(indi_pegasus_flatmaster indidriver)
+install(TARGETS indi_pegasus_flatmaster RUNTIME DESTINATION bin)
 ########### Pegasus Pocket Power Box Driver ###############
 
 SET(pegasus_ppb_SRC
@@ -1777,6 +1822,24 @@ add_executable(indi_openweathermap_weather ${OpenWeatherMap_SRC})
 target_link_libraries(indi_openweathermap_weather indidriver ${CURL_LIBRARIES})
 install(TARGETS indi_openweathermap_weather RUNTIME DESTINATION bin)
 
+########### Deep Sky Dad FP1 ###############
+
+SET(deepskydad_fp1_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/deepskydad_fp1.cpp)
+
+add_executable(indi_deepskydad_fp1 ${deepskydad_fp1_SRC})
+target_link_libraries(indi_deepskydad_fp1 indidriver)
+install(TARGETS indi_deepskydad_fp1 RUNTIME DESTINATION bin)
+
+########### Deep Sky Dad FR1 ###############
+
+SET(deepskydad_fr1_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/rotator/deepskydad_fr1.cpp)
+
+add_executable(indi_deepskydad_fr1 ${deepskydad_fr1_SRC})
+target_link_libraries(indi_deepskydad_fr1 indidriver)
+install(TARGETS indi_deepskydad_fr1 RUNTIME DESTINATION bin)
+
 #####################################
 ############ INDI TOOLS #############
 #####################################
@@ -1979,6 +2042,7 @@ if (INDI_BUILD_DRIVERS OR INDI_BUILD_CLIENT OR INDI_BUILD_QT5_CLIENT)
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indicorrelator.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indidetector.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indispectrograph.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indireceiver.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifilterwheel.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifocuserinterface.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indiweatherinterface.h
@@ -1989,6 +2053,7 @@ if (INDI_BUILD_DRIVERS OR INDI_BUILD_CLIENT OR INDI_BUILD_QT5_CLIENT)
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifilterinterface.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indirotatorinterface.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperty.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indiproperties.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertybasic.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertytext.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/property/indipropertynumber.h

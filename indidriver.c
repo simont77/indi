@@ -136,15 +136,19 @@ void IDDelete(const char *dev, const char *name, const char *fmt, ...)
  */
 void IDSnoopDevice(const char *snooped_device, const char *snooped_property)
 {
-    const userio *io = userio_file();
+    // Ignore empty snooped device
+    if (snooped_device[0])
+    {
+        const userio *io = userio_file();
 
-    pthread_mutex_lock(&stdout_mutex);
+        pthread_mutex_lock(&stdout_mutex);
 
-    userio_xmlv1(io, stdout);
-    IUUserIOGetProperties(io, stdout, snooped_device, snooped_property);
-    fflush(stdout);
+        userio_xmlv1(io, stdout);
+        IUUserIOGetProperties(io, stdout, snooped_device, snooped_property);
+        fflush(stdout);
 
-    pthread_mutex_unlock(&stdout_mutex);
+        pthread_mutex_unlock(&stdout_mutex);
+    }
 }
 
 /* tell indiserver whether we want BLOBs from the given snooped device.
@@ -1320,6 +1324,66 @@ int IUGetConfigOnSwitchIndex(const char *dev, const char *property, int *index)
     delLilXML(lp);
 
     return (*index >= 0 ? 0 : -1);
+}
+
+int IUGetConfigOnSwitchLabel(const char *dev, const char *property, char *label, size_t size)
+{
+    char *rname, *rdev;
+    XMLEle *root = NULL, *fproot = NULL;
+    char errmsg[MAXRBUF];
+    LilXML *lp = newLilXML();
+    int found = -1;
+
+    FILE *fp = IUGetConfigFP(NULL, dev, "r", errmsg);
+
+    if (fp == NULL)
+        return -1;
+
+    fproot = readXMLFile(fp, lp, errmsg);
+
+    if (fproot == NULL)
+    {
+        fclose(fp);
+        return -1;
+    }
+
+    for (root = nextXMLEle(fproot, 1); root != NULL; root = nextXMLEle(fproot, 0))
+    {
+        /* pull out device and name */
+        if (crackDN(root, &rdev, &rname, errmsg) < 0)
+        {
+            fclose(fp);
+            delXMLEle(fproot);
+            return -1;
+        }
+
+        // It doesn't belong to our device??
+        if (strcmp(dev, rdev))
+            continue;
+
+        if ((property && !strcmp(property, rname)) || property == NULL)
+        {
+            XMLEle *oneSwitch = NULL;
+            int currentIndex = 0;
+            for (oneSwitch = nextXMLEle(root, 1); oneSwitch != NULL; oneSwitch = nextXMLEle(root, 0), currentIndex++)
+            {
+                ISState s = ISS_OFF;
+                if (crackISState(pcdataXMLEle(oneSwitch), &s) == 0 && s == ISS_ON)
+                {
+                    found = 0;
+                    strncpy(label, findXMLAttValu(oneSwitch, "name"), size);
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    fclose(fp);
+    delXMLEle(fproot);
+    delLilXML(lp);
+
+    return found;
 }
 
 int IUGetConfigNumber(const char *dev, const char *property, const char *member, double *value)
