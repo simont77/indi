@@ -17,6 +17,7 @@
 *******************************************************************************/
 
 #define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
 
 #include "baseclient.h"
 
@@ -38,6 +39,7 @@
 #include "indiuserio.h"
 
 #ifdef _WINDOWS
+#include <ws2tcpip.h>
 #include <windows.h>
 
 #define net_read(x,y,z) recv(x,y,z,0)

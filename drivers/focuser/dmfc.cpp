@@ -38,6 +38,8 @@ static std::unique_ptr<DMFC> dmfc(new DMFC());
 
 DMFC::DMFC()
 {
+    setVersion(1, 1);
+
     // Can move in Absolute & Relative motions, can AbortFocuser motion.
     FI::SetCapability(FOCUSER_CAN_ABS_MOVE |
                       FOCUSER_CAN_REL_MOVE |
@@ -118,9 +120,6 @@ bool DMFC::updateProperties()
     {
         defineProperty(&TemperatureNP);
         defineProperty(&EncoderSP);
-        defineProperty(&FocusReverseSP);
-        defineProperty(&FocusBacklashSP);
-        defineProperty(&FocusBacklashNP);
         defineProperty(&MotorTypeSP);
         defineProperty(&MaxSpeedNP);
         defineProperty(&LEDSP);
@@ -130,9 +129,6 @@ bool DMFC::updateProperties()
     {
         deleteProperty(TemperatureNP.name);
         deleteProperty(EncoderSP.name);
-        deleteProperty(FocusReverseSP.name);
-        deleteProperty(FocusBacklashSP.name);
-        deleteProperty(FocusBacklashNP.name);
         deleteProperty(MotorTypeSP.name);
         deleteProperty(MaxSpeedNP.name);
         deleteProperty(LEDSP.name);
