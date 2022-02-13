@@ -337,6 +337,11 @@ class CCDChip
         void setExposureLeft(double duration);
 
         /**
+         * @brief setExposureComplete Mark exposure as complete by setting ImageExposure property to IPS_OK
+         */
+        void setExposureComplete();
+
+        /**
          * @brief setExposureFailed Alert the client that the exposure failed.
          */
         void setExposureFailed();
@@ -375,10 +380,16 @@ class CCDChip
         }
 
         /**
-         * @brief binFrame Perform softwre binning on the CCD frame. Only use this function if hardware
+         * @brief binFrame Perform software binning on the CCD frame. Only use this function if hardware
          * binning is not supported.
          */
         void binFrame();
+
+        /**
+         * @brief binBayerFrame Perform software binning on a 2x2 Bayer matrix CCD frame. Only use this function if hardware
+         * binning is not supported.
+         */
+        void binBayerFrame();
 
     private:
         /////////////////////////////////////////////////////////////////////////////////////////

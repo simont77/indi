@@ -16,7 +16,7 @@
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-    
+
     Updated for PEC V3
 */
 
@@ -96,14 +96,14 @@ class IOptronV3 : public INDI::Telescope, public INDI::GuiderInterface
             * @brief getStartupData Get initial mount info on startup.
             */
         void getStartupData();
-        
+
         /** Mod v3.0 PEC Data Status
             * @brief get PEC data from the mount info.
             * @param true  = Update log
             * @param false = Don't update log
             */
         bool GetPECDataStatus(bool enabled);
-        
+
         /* Mod v3.0 Adding PEC Recording Switches  */
         
         ISwitchVectorProperty PECTrainingSP;         
@@ -165,6 +165,14 @@ class IOptronV3 : public INDI::Telescope, public INDI::GuiderInterface
         ISwitch DaylightS[2];
         ISwitchVectorProperty DaylightSP;
 
+        // Meridian Behavior
+        ISwitch MeridianActionS[2];
+        ISwitchVectorProperty MeridianActionSP;
+
+        // Meridian Limit
+        INumber MeridianLimitN[1];
+        INumberVectorProperty MeridianLimitNP;
+
         uint32_t DBG_SCOPE;
 
         double currentRA, currentDEC;
@@ -172,6 +180,10 @@ class IOptronV3 : public INDI::Telescope, public INDI::GuiderInterface
 
         IOPv3::IOPInfo scopeInfo;
         IOPv3::FirmwareInfo firmwareInfo;
+
+        uint8_t m_ParkingCounter {0};
+        static constexpr const uint8_t MAX_PARK_COUNTER {2};
+        static constexpr const char *MB_TAB {"Meridian Behavior"};
 
         std::unique_ptr<IOPv3::Driver> driver;
 };

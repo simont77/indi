@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110 - 1301  USA
 #include "lx/Lx.h"
 
 // Pixel size info for different cameras
-typedef struct
+typedef struct PixelSizeInfo
 {
     const char * deviceLabel; // Device label used by INDI
     const char * deviceName; // device name reported by V4L
@@ -54,7 +54,9 @@ static const PixelSizeInfo CameraDatabase[] =
     { "Skyris 236C", "Skyris 236C", nullptr, 2.8f, -1, false },
     { "Skyris 236M", "Skyris 236M", nullptr, 2.8f, -1, false },
     { "iOptron iPolar", "iOptron iPolar: iOptron iPolar", nullptr, 3.75f, -1, true },
+    { "iOptron iPolar", "iOptron iPolar", nullptr, 3.75f, -1, true },
     { "iOptron iGuider", "iOptron iGuider: iOptron iGuide", nullptr, 3.75f, -1, true },
+    { "iOptron iGuider", "iOptron iGuider 1", nullptr, 3.75f, -1, true },
     { "Raspberry Pi High Quality Camera", "mmal service 16.1", "Raspberry Pi High Quality Camera", 1.55f, -1, true },
     { "Logitech HD C270", "UVC Camera (046d:0825)", "Logitech HD C270", 2.8f, -1, true },
     { "IMX290 Camera", "USB 2.0 Camera: USB Camera", "USB 2.0 IMX290 Board", 2.9f, -1, true },
@@ -67,6 +69,7 @@ V4L2_Driver::V4L2_Driver(std::string label, std::string path)
 {
     setDeviceName(label.c_str());
     strncpy(defaultVideoPort, path.c_str(), 256);
+    strncpy(configPort, path.c_str(), 256);
 
     setVersion(1, 0);
 
@@ -152,7 +155,9 @@ bool V4L2_Driver::initProperties()
     addDebugControl();
 
     /* Port */
-    if (IUGetConfigText(getDeviceName(), PortTP.name, PortT[0].name, configPort, 256) == 0)
+    // Only load config port if it was empty. If it was already initialized, then we have an explicitly defined device
+    // with defaultVideoPort and we shouldn't mess this up.
+    if (configPort[0] == 0 && IUGetConfigText(getDeviceName(), PortTP.name, PortT[0].name, configPort, 256) == 0)
         IUFillText(&PortT[0], "PORT", "Port", configPort);
     else
         IUFillText(&PortT[0], "PORT", "Port", defaultVideoPort);
@@ -160,8 +165,10 @@ bool V4L2_Driver::initProperties()
                      IPS_IDLE);
 
     /* Color space */
-    IUFillSwitch(&ImageColorS[IMAGE_GRAYSCALE], "CCD_COLOR_GRAY", "Gray", ISS_ON);
-    IUFillSwitch(&ImageColorS[1], "CCD_COLOR_RGB", "Color", ISS_OFF);
+    int configColor = IMAGE_GRAYSCALE;
+    IUGetConfigOnSwitchIndex(getDeviceName(), "CCD_COLOR_SPACE", &configColor);
+    IUFillSwitch(&ImageColorS[IMAGE_GRAYSCALE], "CCD_COLOR_GRAY", "Gray", configColor == IMAGE_GRAYSCALE ? ISS_ON : ISS_OFF);
+    IUFillSwitch(&ImageColorS[IMAGE_COLOR], "CCD_COLOR_RGB", "Color", configColor == IMAGE_COLOR ? ISS_ON : ISS_OFF);
     IUFillSwitchVector(&ImageColorSP, ImageColorS, NARRAY(ImageColorS), getDeviceName(), "CCD_COLOR_SPACE",
                        "Image Type", IMAGE_SETTINGS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 
@@ -328,9 +335,11 @@ bool V4L2_Driver::updateProperties()
         {
             std::string infoDeviceName = std::string(info->deviceName);
             std::transform(infoDeviceName.begin(), infoDeviceName.end(), infoDeviceName.begin(), ::tolower);
+            std::string infoDeviceLabel = std::string(info->deviceLabel);
+            std::transform(infoDeviceLabel.begin(), infoDeviceLabel.end(), infoDeviceLabel.begin(), ::tolower);
 
             // Case insensitive comparision
-            if (infoDeviceName == deviceName)
+            if (infoDeviceName == deviceName || infoDeviceLabel == deviceName)
                 break;
             ++info;
         }
@@ -972,7 +981,9 @@ bool V4L2_Driver::setShutter(double duration)
         frameCount    = 0;
         subframeCount = 0;
 
-        LOGF_INFO("Started %.3f-second manual exposure.", duration);
+        // Do not spam log for short exposures.
+        if (duration >= 3)
+            LOGF_INFO("Started %.3f-second manual exposure.", duration);
         return true;
     }
     else
@@ -1663,7 +1674,8 @@ void V4L2_Driver::newFrame()
             if (Streamer->isBusy() == false)
                 stop_capturing();
 
-            LOGF_INFO("Capture of LX frame took %ld.%06ld seconds.", current_exposure.tv_sec, current_exposure.tv_usec);
+            if (PrimaryCCD.getExposureDuration() >= 3)
+                LOGF_INFO("Capture of LX frame took %ld.%06ld seconds.", current_exposure.tv_sec, current_exposure.tv_usec);
             ExposureComplete(&PrimaryCCD);
         }
         else
@@ -1675,10 +1687,12 @@ void V4L2_Driver::newFrame()
                 is_capturing = false;
             }
             else
-                IDLog("%s: streamer is busy, continue capturing\n", __FUNCTION__);
+                LOGF_DEBUG("%s: streamer is busy, continue capturing\n", __FUNCTION__);
 
-            LOGF_INFO("Capture of one frame (%d stacked frames) took %ld.%06ld seconds.",
-                      subframeCount, current_exposure.tv_sec, current_exposure.tv_usec);
+
+            if (PrimaryCCD.getExposureDuration() >= 3)
+                LOGF_INFO("Capture of one frame (%d stacked frames) took %ld.%06ld seconds.",  subframeCount, current_exposure.tv_sec,
+                          current_exposure.tv_usec);
             ExposureComplete(&PrimaryCCD);
         }
     }
@@ -1934,6 +1948,7 @@ bool V4L2_Driver::saveConfigItems(FILE * fp)
 
     IUSaveConfigText(fp, &PortTP);
     IUSaveConfigSwitch(fp, &StackModeSP);
+    IUSaveConfigSwitch(fp, &ImageColorSP);
 
     if (ImageAdjustNP.nnp > 0)
         IUSaveConfigNumber(fp, &ImageAdjustNP);

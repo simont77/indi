@@ -520,6 +520,15 @@ class CCD : public DefaultDevice, GuiderInterface
          */
         virtual void checkTemperatureTarget();
 
+        /**
+         * @brief processFastExposure After an exposure is complete, check if fast
+         * exposure was enabled. If it is, then immediately start the next exposure
+         * if possible and decrement the counter.
+         * @param targetChip Active fast exposure chip.
+         * @return True if next fast exposure is started, false otherwise.
+         */
+        virtual bool processFastExposure(CCDChip * targetChip);
+
 
         // Epoch Position
         double RA, Dec;
@@ -530,6 +539,11 @@ class CCD : public DefaultDevice, GuiderInterface
         // J2000 Position
         double J2000RA;
         double J2000DE;
+        bool J2000Valid;
+
+        // exposure information
+        char exposureStartTime[MAXINDINAME];
+        double exposureDuration;
 
         double primaryFocalLength, primaryAperture, guiderFocalLength, guiderAperture;
         bool InExposure;
@@ -592,6 +606,14 @@ class CCD : public DefaultDevice, GuiderInterface
          */
         INumberVectorProperty EqNP;
         INumber EqN[2];
+
+        /**
+         * @brief J200EqNP Snoop property to read the equatorial J2000 coordinates of the mount.
+         * ActiveDeviceTP defines snoop devices and the driver listens to this property emitted
+         * by the mount driver if specified. It is important to generate a proper FITS header.
+         */
+        INumberVectorProperty J2000EqNP;
+        INumber J2000EqN[2];
 
         /**
          * @brief ActiveDeviceTP defines 4 devices the camera driver can listen to (snoop) for

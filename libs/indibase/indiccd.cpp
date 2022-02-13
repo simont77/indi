@@ -91,6 +91,7 @@ CCD::CCD()
     pierSide        = -1;
     J2000RA         = std::numeric_limits<double>::quiet_NaN();
     J2000DE         = std::numeric_limits<double>::quiet_NaN();
+    J2000Valid      = false;
     MPSAS           = std::numeric_limits<double>::quiet_NaN();
     RotatorAngle    = std::numeric_limits<double>::quiet_NaN();
     // JJ ed 2019-12-10
@@ -110,6 +111,9 @@ CCD::CCD()
     // Check temperature every 5 seconds.
     m_TemperatureCheckTimer.setInterval(5000);
     m_TemperatureCheckTimer.callOnTimeout(std::bind(&CCD::checkTemperatureTarget, this));
+
+    exposureStartTime[0] = 0;
+    exposureDuration = 0.0;
 }
 
 CCD::~CCD()
@@ -422,10 +426,18 @@ bool CCD::initProperties()
                        IP_RW,
                        60, IPS_IDLE);
 
+    // Snooped J2000 RA/DEC Property
+    IUFillNumber(&J2000EqN[0], "RA", "Ra (hh:mm:ss)", "%010.6m", 0, 24, 0, 0);
+    IUFillNumber(&J2000EqN[1], "DEC", "Dec (dd:mm:ss)", "%010.6m", -90, 90, 0, 0);
+    IUFillNumberVector(&J2000EqNP, J2000EqN, 2, ActiveDeviceT[ACTIVE_TELESCOPE].text, "EQUATORIAL_COORD", "J2000 EQ Coord",
+                       "Main Control", IP_RW,
+                       60, IPS_IDLE);
+
     // Snoop properties of interest
 
     // Snoop mount
     IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "EQUATORIAL_EOD_COORD");
+    IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "EQUATORIAL_COORD");
     IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "TELESCOPE_INFO");
     IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "GEOGRAPHIC_COORD");
     IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "TELESCOPE_PIER_SIDE");
@@ -680,6 +692,19 @@ bool CCD::ISSnoopDevice(XMLEle * root)
             Dec = newdec;
         }
     }
+    else if (IUSnoopNumber(root, &J2000EqNP) == 0)
+    {
+        float newra, newdec;
+        newra  = J2000EqN[0].value;
+        newdec = J2000EqN[1].value;
+        if ((newra != J2000RA) || (newdec != J2000DE))
+        {
+            //    	    IDLog("J2000 RA %4.2f  Dec %4.2f Snooped RA %4.2f  Dec %4.2f\n",J2000RA,J2000DE,newra,newdec);
+            J2000RA = newra;
+            J2000DE = newdec;
+        }
+        J2000Valid = true;
+    }
     else if (!strcmp("TELESCOPE_PIER_SIDE", propName))
     {
         // set default to say we have no valid information from mount
@@ -825,9 +850,11 @@ bool CCD::ISNewText(const char * dev, const char * name, char * texts[], char * 
 
             // Update the property name!
             strncpy(EqNP.device, ActiveDeviceT[ACTIVE_TELESCOPE].text, MAXINDIDEVICE);
+            strncpy(J2000EqNP.device, ActiveDeviceT[ACTIVE_TELESCOPE].text, MAXINDIDEVICE);
             if (strlen(ActiveDeviceT[ACTIVE_TELESCOPE].text) > 0)
             {
                 IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "EQUATORIAL_EOD_COORD");
+                IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "EQUATORIAL_COORD");
                 IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "TELESCOPE_INFO");
                 IDSnoopDevice(ActiveDeviceT[ACTIVE_TELESCOPE].text, "GEOGRAPHIC_COORD");
             }
@@ -951,33 +978,6 @@ bool CCD::ISNewNumber(const char * dev, const char * name, double values[], char
 
             if (StartExposure(ExposureTime))
             {
-                if (PrimaryCCD.getFrameType() == CCDChip::LIGHT_FRAME && !std::isnan(RA) && !std::isnan(Dec))
-                {
-                    INDI::IEquatorialCoordinates epochPos { 0, 0 }, J2000Pos { 0, 0 };
-                    epochPos.rightascension  = RA;
-                    epochPos.declination = Dec;
-
-                    // Convert from JNow to J2000
-                    INDI::ObservedToJ2000(&epochPos, ln_get_julian_from_sys(), &J2000Pos);
-
-                    J2000RA = J2000Pos.rightascension;
-                    J2000DE = J2000Pos.declination;
-
-                    if (!std::isnan(Latitude) && !std::isnan(Longitude))
-                    {
-                        // Horizontal Coords
-                        INDI::IHorizontalCoordinates horizontalPos;
-                        IGeographicCoordinates observer;
-                        observer.latitude = Latitude;
-                        observer.longitude = Longitude;
-
-                        EquatorialToHorizontal(&epochPos, &observer, ln_get_julian_from_sys(), &horizontalPos);
-                        Azimuth = horizontalPos.azimuth;
-                        Altitude = horizontalPos.altitude;
-                        Airmass = ln_get_airmass(Altitude, 750);
-                    }
-                }
-
                 PrimaryCCD.ImageExposureNP.s = IPS_BUSY;
                 if (ExposureTime * 1000 < getCurrentPollingPeriod())
                     setCurrentPollingPeriod(ExposureTime * 950);
@@ -1362,6 +1362,15 @@ bool CCD::ISNewSwitch(const char * dev, const char * name, ISState * states, cha
             // Only display warning for the first time this is enabled.
             if (FastExposureToggleSP.s == IPS_IDLE && FastExposureToggleS[INDI_ENABLED].s == ISS_ON)
                 LOG_WARN("Experimental Feature: After a frame is downloaded, the next frame capture immediately starts to avoid any delays.");
+
+            if (FastExposureToggleS[INDI_DISABLED].s == ISS_ON)
+            {
+                FastExposureCountNP.s = IPS_IDLE;
+                IDSetNumber(&FastExposureCountNP, nullptr);
+                m_UploadTime = 0;
+                if (PrimaryCCD.isExposing())
+                    AbortExposure();
+            }
 
             FastExposureToggleSP.s = IPS_OK;
             IDSetSwitch(&FastExposureToggleSP, nullptr);
@@ -1767,7 +1776,6 @@ void CCD::addFITSKeywords(fitsfile * fptr, CCDChip * targetChip)
 {
     int status = 0;
     char dev_name[MAXINDINAME] = {0};
-    char exp_start[MAXINDINAME] = {0};
     double effectiveFocalLength = std::numeric_limits<double>::quiet_NaN();
     double effectiveAperture = std::numeric_limits<double>::quiet_NaN();
 
@@ -1817,12 +1825,11 @@ void CCD::addFITSKeywords(fitsfile * fptr, CCDChip * targetChip)
     uint32_t subBinY = targetChip->getBinY();
 
     strncpy(dev_name, getDeviceName(), MAXINDINAME);
-    strncpy(exp_start, targetChip->getExposureStartTime(), MAXINDINAME);
 
-    fits_update_key_dbl(fptr, "EXPTIME", targetChip->getExposureDuration(), 6, "Total Exposure Time (s)", &status);
+    fits_update_key_dbl(fptr, "EXPTIME", exposureDuration, 6, "Total Exposure Time (s)", &status);
 
     if (targetChip->getFrameType() == CCDChip::DARK_FRAME)
-        fits_update_key_dbl(fptr, "DARKTIME", targetChip->getExposureDuration(), 6, "Total Dark Exposure Time (s)", &status);
+        fits_update_key_dbl(fptr, "DARKTIME", exposureDuration, 6, "Total Dark Exposure Time (s)", &status);
 
     // If the camera has a cooler OR if the temperature permission was explicitly set to Read-Only, then record the temperature
     if (HasCooler() || TemperatureNP.p == IP_RO)
@@ -1916,8 +1923,45 @@ void CCD::addFITSKeywords(fitsfile * fptr, CCDChip * targetChip)
     }
 
 
-    if (targetChip->getFrameType() == CCDChip::LIGHT_FRAME && !std::isnan(J2000RA) && !std::isnan(J2000DE))
+    if ( targetChip->getFrameType() == CCDChip::LIGHT_FRAME && !std::isnan(RA) && !std::isnan(Dec) && (std::isnan(J2000RA)
+            || std::isnan(J2000DE) || !J2000Valid) )
     {
+        INDI::IEquatorialCoordinates epochPos { 0, 0 }, J2000Pos { 0, 0 };
+        epochPos.rightascension  = RA;
+        epochPos.declination = Dec;
+
+        // Convert from JNow to J2000
+        INDI::ObservedToJ2000(&epochPos, ln_get_julian_from_sys(), &J2000Pos);
+
+        J2000RA = J2000Pos.rightascension;
+        J2000DE = J2000Pos.declination;
+    }
+    J2000Valid = false;  // enforce usage of EOD position if we receive no new epoch position
+
+    if ( targetChip->getFrameType() == CCDChip::LIGHT_FRAME && !std::isnan(J2000RA) && !std::isnan(J2000DE) )
+    {
+        if (!std::isnan(Latitude) && !std::isnan(Longitude))
+        {
+            INDI::IEquatorialCoordinates epochPos { 0, 0 }, J2000Pos { 0, 0 };
+
+            J2000Pos.rightascension = J2000RA;
+            J2000Pos.declination = J2000DE;
+
+            // Convert from JNow to J2000
+            INDI::J2000toObserved(&J2000Pos, ln_get_julian_from_sys(), &epochPos);
+
+            // Horizontal Coords
+            INDI::IHorizontalCoordinates horizontalPos;
+            IGeographicCoordinates observer;
+            observer.latitude = Latitude;
+            observer.longitude = Longitude;
+
+            EquatorialToHorizontal(&epochPos, &observer, ln_get_julian_from_sys(), &horizontalPos);
+            Azimuth = horizontalPos.azimuth;
+            Altitude = horizontalPos.altitude;
+            Airmass = ln_get_airmass(Altitude, 750);
+        }
+
         char ra_str[32] = {0}, de_str[32] = {0};
 
         fs_sexa(ra_str, J2000RA, 2, 360000);
@@ -2023,7 +2067,7 @@ void CCD::addFITSKeywords(fitsfile * fptr, CCDChip * targetChip)
         }
     }
 
-    fits_update_key_str(fptr, "DATE-OBS", exp_start, "UTC start date of observation", &status);
+    fits_update_key_str(fptr, "DATE-OBS", exposureStartTime, "UTC start date of observation", &status);
     fits_write_comment(fptr, "Generated by INDI", &status);
 }
 
@@ -2047,6 +2091,10 @@ bool CCD::ExposureComplete(CCDChip * targetChip)
 
 bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
 {
+    // save information used for the fits header
+    exposureDuration = targetChip->getExposureDuration();
+    strncpy(exposureStartTime, targetChip->getExposureStartTime(), MAXINDINAME);
+
     if(HasDSP())
     {
         uint8_t* buf = static_cast<uint8_t*>(malloc(targetChip->getFrameBufferSize()));
@@ -2056,507 +2104,17 @@ bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
         free(buf);
     }
 
-    // If fast exposure is on, let's immediately take another capture
-    if (FastExposureToggleS[INDI_ENABLED].s == ISS_ON)
-    {
-        double duration = targetChip->getExposureDuration();
+    if (processFastExposure(targetChip) == false)
+        return false;
 
-        // Check fast exposure count
-        if (FastExposureCountN[0].value > 1)
-        {
-            if (FastExposureCountNP.s != IPS_BUSY)
-            {
-                FastExposureToggleStartup = std::chrono::system_clock::now();
-            }
-            else
-            {
-                auto end = std::chrono::system_clock::now();
+    bool sendImage = (UploadS[UPLOAD_CLIENT].s == ISS_ON || UploadS[UPLOAD_BOTH].s == ISS_ON);
+    bool saveImage = (UploadS[UPLOAD_LOCAL].s == ISS_ON || UploadS[UPLOAD_BOTH].s == ISS_ON);
 
-                m_UploadTime = (std::chrono::duration_cast<std::chrono::milliseconds>(end - FastExposureToggleStartup)).count() / 1000.0 -
-                               duration;
-                LOGF_DEBUG("Image download and upload/save took %.3f seconds.", m_UploadTime);
+    // Do not send or save an empty image.
+    if (targetChip->getFrameBufferSize() == 0)
+        sendImage = saveImage = false;
 
-                FastExposureToggleStartup = end;
-            }
-
-            FastExposureCountNP.s = IPS_BUSY;
-            FastExposureCountN[0].value--;
-            IDSetNumber(&FastExposureCountNP, nullptr);
-
-            if (m_UploadTime < duration)
-            {
-                StartExposure(duration);
-                PrimaryCCD.ImageExposureNP.s = IPS_BUSY;
-                IDSetNumber(&PrimaryCCD.ImageExposureNP, nullptr);
-                if (duration * 1000 < getCurrentPollingPeriod())
-                    setCurrentPollingPeriod(duration * 950);
-            }
-            else
-            {
-                LOGF_ERROR("Rapid exposure not possible since upload time is %.2f seconds while exposure time is %.2f seconds.",
-                           m_UploadTime,
-                           duration);
-                PrimaryCCD.ImageExposureNP.s = IPS_ALERT;
-                IDSetNumber(&PrimaryCCD.ImageExposureNP, nullptr);
-                FastExposureCountN[0].value = 1;
-                FastExposureCountNP.s = IPS_IDLE;
-                IDSetNumber(&FastExposureCountNP, nullptr);
-                m_UploadTime = 0;
-                return false;
-            }
-        }
-        else
-        {
-            m_UploadTime = 0;
-            FastExposureCountNP.s = IPS_IDLE;
-            IDSetNumber(&FastExposureCountNP, nullptr);
-        }
-    }
-
-    bool sendImage = (UploadS[0].s == ISS_ON || UploadS[2].s == ISS_ON);
-    bool saveImage = (UploadS[1].s == ISS_ON || UploadS[2].s == ISS_ON);
-
-#if 0
-    bool showMarker = false;
-    bool autoLoop   = false;
-    bool sendData   = false;
-
-    if (RapidGuideEnabled && targetChip == &PrimaryCCD && (PrimaryCCD.getBPP() == 16 || PrimaryCCD.getBPP() == 8))
-    {
-        autoLoop   = AutoLoop;
-        sendImage  = SendImage;
-        showMarker = ShowMarker;
-        sendData   = true;
-        saveImage  = false;
-    }
-
-    if (GuiderRapidGuideEnabled && targetChip == &GuideCCD && (GuideCCD.getBPP() == 16 || PrimaryCCD.getBPP() == 8))
-    {
-        autoLoop   = GuiderAutoLoop;
-        sendImage  = GuiderSendImage;
-        showMarker = GuiderShowMarker;
-        sendData   = true;
-        saveImage  = false;
-    }
-
-    if (sendData)
-    {
-        static double P0 = 0.906, P1 = 0.584, P2 = 0.365, P3 = 0.117, P4 = 0.049, P5 = -0.05, P6 = -0.064, P7 = -0.074,
-                      P8               = -0.094;
-        targetChip->RapidGuideDataNP.s = IPS_BUSY;
-        int width                      = targetChip->getSubW() / targetChip->getBinX();
-        int height                     = targetChip->getSubH() / targetChip->getBinY();
-        void * src                      = (unsigned short *)targetChip->getFrameBuffer();
-        int i0, i1, i2, i3, i4, i5, i6, i7, i8;
-        int ix = 0, iy = 0;
-        int xM4;
-        double average, fit, bestFit = 0;
-        int minx = 4;
-        int maxx = width - 4;
-        int miny = 4;
-        int maxy = height - 4;
-        if (targetChip->lastRapidX > 0 && targetChip->lastRapidY > 0)
-        {
-            minx = std::max(targetChip->lastRapidX - 20, 4);
-            maxx = std::min(targetChip->lastRapidX + 20, width - 4);
-            miny = std::max(targetChip->lastRapidY - 20, 4);
-            maxy = std::min(targetChip->lastRapidY + 20, height - 4);
-        }
-        if (targetChip->getBPP() == 16)
-        {
-            unsigned short * p;
-            for (int x = minx; x < maxx; x++)
-                for (int y = miny; y < maxy; y++)
-                {
-                    i0 = i1 = i2 = i3 = i4 = i5 = i6 = i7 = i8 = 0;
-                    xM4                                        = x - 4;
-                    p                                          = (unsigned short *)src + (y - 4) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y - 3) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i6 += *p++;
-                    i7 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y - 2) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i5 += *p++;
-                    i4 += *p++;
-                    i3 += *p++;
-                    i4 += *p++;
-                    i5 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y - 1) * width + xM4;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i4 += *p++;
-                    i2 += *p++;
-                    i1 += *p++;
-                    i2 += *p++;
-                    i4 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y + 0) * width + xM4;
-                    i8 += *p++;
-                    i6 += *p++;
-                    i3 += *p++;
-                    i1 += *p++;
-                    i0 += *p++;
-                    i1 += *p++;
-                    i3 += *p++;
-                    i6 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y + 1) * width + xM4;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i4 += *p++;
-                    i2 += *p++;
-                    i1 += *p++;
-                    i2 += *p++;
-                    i4 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y + 2) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i5 += *p++;
-                    i4 += *p++;
-                    i3 += *p++;
-                    i4 += *p++;
-                    i5 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y + 3) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i6 += *p++;
-                    i7 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned short *)src + (y + 4) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    average = (i0 + i1 + i2 + i3 + i4 + i5 + i6 + i7 + i8) / 85.0;
-                    fit     = P0 * (i0 - average) + P1 * (i1 - 4 * average) + P2 * (i2 - 4 * average) +
-                              P3 * (i3 - 4 * average) + P4 * (i4 - 8 * average) + P5 * (i5 - 4 * average) +
-                              P6 * (i6 - 4 * average) + P7 * (i7 - 8 * average) + P8 * (i8 - 48 * average);
-                    if (bestFit < fit)
-                    {
-                        bestFit = fit;
-                        ix      = x;
-                        iy      = y;
-                    }
-                }
-        }
-        else
-        {
-            unsigned char * p;
-            for (int x = minx; x < maxx; x++)
-                for (int y = miny; y < maxy; y++)
-                {
-                    i0 = i1 = i2 = i3 = i4 = i5 = i6 = i7 = i8 = 0;
-                    xM4                                        = x - 4;
-                    p                                          = (unsigned char *)src + (y - 4) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y - 3) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i6 += *p++;
-                    i7 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y - 2) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i5 += *p++;
-                    i4 += *p++;
-                    i3 += *p++;
-                    i4 += *p++;
-                    i5 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y - 1) * width + xM4;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i4 += *p++;
-                    i2 += *p++;
-                    i1 += *p++;
-                    i2 += *p++;
-                    i4 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y + 0) * width + xM4;
-                    i8 += *p++;
-                    i6 += *p++;
-                    i3 += *p++;
-                    i1 += *p++;
-                    i0 += *p++;
-                    i1 += *p++;
-                    i3 += *p++;
-                    i6 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y + 1) * width + xM4;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i4 += *p++;
-                    i2 += *p++;
-                    i1 += *p++;
-                    i2 += *p++;
-                    i4 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y + 2) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i5 += *p++;
-                    i4 += *p++;
-                    i3 += *p++;
-                    i4 += *p++;
-                    i5 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y + 3) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i7 += *p++;
-                    i6 += *p++;
-                    i7 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    p = (unsigned char *)src + (y + 4) * width + xM4;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    i8 += *p++;
-                    average = (i0 + i1 + i2 + i3 + i4 + i5 + i6 + i7 + i8) / 85.0;
-                    fit     = P0 * (i0 - average) + P1 * (i1 - 4 * average) + P2 * (i2 - 4 * average) +
-                              P3 * (i3 - 4 * average) + P4 * (i4 - 8 * average) + P5 * (i5 - 4 * average) +
-                              P6 * (i6 - 4 * average) + P7 * (i7 - 8 * average) + P8 * (i8 - 48 * average);
-                    if (bestFit < fit)
-                    {
-                        bestFit = fit;
-                        ix      = x;
-                        iy      = y;
-                    }
-                }
-        }
-
-        targetChip->RapidGuideDataN[0].value = ix;
-        targetChip->RapidGuideDataN[1].value = iy;
-        targetChip->RapidGuideDataN[2].value = bestFit;
-        targetChip->lastRapidX               = ix;
-        targetChip->lastRapidY               = iy;
-        if (bestFit > 50)
-        {
-            int sumX           = 0;
-            int sumY           = 0;
-            int total          = 0;
-            int max            = 0;
-            int noiseThreshold = 0;
-
-            if (targetChip->getBPP() == 16)
-            {
-                unsigned short * p;
-                for (int y = iy - 4; y <= iy + 4; y++)
-                {
-                    p = (unsigned short *)src + y * width + ix - 4;
-                    for (int x = ix - 4; x <= ix + 4; x++)
-                    {
-                        int w = *p++;
-                        noiseThreshold += w;
-                        if (w > max)
-                            max = w;
-                    }
-                }
-                noiseThreshold = (noiseThreshold / 81 + max) / 2; // set threshold between peak and average
-                for (int y = iy - 4; y <= iy + 4; y++)
-                {
-                    p = (unsigned short *)src + y * width + ix - 4;
-                    for (int x = ix - 4; x <= ix + 4; x++)
-                    {
-                        int w = *p++;
-                        if (w < noiseThreshold)
-                            w = 0;
-                        sumX += x * w;
-                        sumY += y * w;
-                        total += w;
-                    }
-                }
-            }
-            else
-            {
-                unsigned char * p;
-                for (int y = iy - 4; y <= iy + 4; y++)
-                {
-                    p = (unsigned char *)src + y * width + ix - 4;
-                    for (int x = ix - 4; x <= ix + 4; x++)
-                    {
-                        int w = *p++;
-                        noiseThreshold += w;
-                        if (w > max)
-                            max = w;
-                    }
-                }
-                noiseThreshold = (noiseThreshold / 81 + max) / 2; // set threshold between peak and average
-                for (int y = iy - 4; y <= iy + 4; y++)
-                {
-                    p = (unsigned char *)src + y * width + ix - 4;
-                    for (int x = ix - 4; x <= ix + 4; x++)
-                    {
-                        int w = *p++;
-                        if (w < noiseThreshold)
-                            w = 0;
-                        sumX += x * w;
-                        sumY += y * w;
-                        total += w;
-                    }
-                }
-            }
-
-            if (total > 0)
-            {
-                targetChip->RapidGuideDataN[0].value = ((double)sumX) / total;
-                targetChip->RapidGuideDataN[1].value = ((double)sumY) / total;
-                targetChip->RapidGuideDataNP.s       = IPS_OK;
-
-                DEBUGF(Logger::DBG_DEBUG, "Guide Star X: %g Y: %g FIT: %g", targetChip->RapidGuideDataN[0].value,
-                       targetChip->RapidGuideDataN[1].value, targetChip->RapidGuideDataN[2].value);
-            }
-            else
-            {
-                targetChip->RapidGuideDataNP.s = IPS_ALERT;
-                targetChip->lastRapidX = targetChip->lastRapidY = -1;
-            }
-        }
-        else
-        {
-            targetChip->RapidGuideDataNP.s = IPS_ALERT;
-            targetChip->lastRapidX = targetChip->lastRapidY = -1;
-        }
-        IDSetNumber(&targetChip->RapidGuideDataNP, nullptr);
-
-        if (showMarker)
-        {
-            int xmin = std::max(ix - 10, 0);
-            int xmax = std::min(ix + 10, width - 1);
-            int ymin = std::max(iy - 10, 0);
-            int ymax = std::min(iy + 10, height - 1);
-
-            //fprintf(stderr, "%d %d %d %d\n", xmin, xmax, ymin, ymax);
-
-            if (targetChip->getBPP() == 16)
-            {
-                unsigned short * p;
-                if (ymin > 0)
-                {
-                    p = (unsigned short *)src + ymin * width + xmin;
-                    for (int x = xmin; x <= xmax; x++)
-                        *p++ = 50000;
-                }
-
-                if (xmin > 0)
-                {
-                    for (int y = ymin; y <= ymax; y++)
-                    {
-                        *((unsigned short *)src + y * width + xmin) = 50000;
-                    }
-                }
-
-                if (xmax < width - 1)
-                {
-                    for (int y = ymin; y <= ymax; y++)
-                    {
-                        *((unsigned short *)src + y * width + xmax) = 50000;
-                    }
-                }
-
-                if (ymax < height - 1)
-                {
-                    p = (unsigned short *)src + ymax * width + xmin;
-                    for (int x = xmin; x <= xmax; x++)
-                        *p++ = 50000;
-                }
-            }
-            else
-            {
-                unsigned char * p;
-                if (ymin > 0)
-                {
-                    p = (unsigned char *)src + ymin * width + xmin;
-                    for (int x = xmin; x <= xmax; x++)
-                        *p++ = 255;
-                }
-
-                if (xmin > 0)
-                {
-                    for (int y = ymin; y <= ymax; y++)
-                    {
-                        *((unsigned char *)src + y * width + xmin) = 255;
-                    }
-                }
-
-                if (xmax < width - 1)
-                {
-                    for (int y = ymin; y <= ymax; y++)
-                    {
-                        *((unsigned char *)src + y * width + xmax) = 255;
-                    }
-                }
-
-                if (ymax < height - 1)
-                {
-                    p = (unsigned char *)src + ymax * width + xmin;
-                    for (int x = xmin; x <= xmax; x++)
-                        *p++ = 255;
-                }
-            }
-        }
-    }
-#endif
-
-    if (sendImage || saveImage /* || useSolver*/)
+    if (sendImage || saveImage)
     {
         if (!strcmp(targetChip->getImageExtension(), "fits"))
         {
@@ -2689,74 +2247,13 @@ bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
         }
     }
 
-    targetChip->ImageExposureNP.s = IPS_OK;
-    IDSetNumber(&targetChip->ImageExposureNP, nullptr);
-
-#if 0
-    if (autoLoop)
-    {
-        if (targetChip == &PrimaryCCD)
-        {
-            PrimaryCCD.ImageExposureN[0].value = ExposureTime;
-            if (StartExposure(ExposureTime))
-            {
-                // Record information required later in creation of FITS header
-                if (targetChip->getFrameType() == CCDChip::LIGHT_FRAME && !std::isnan(RA) && !std::isnan(Dec))
-                {
-                    INDI::IEquatorialCoordinates epochPos { 0, 0 }, J2000Pos { 0, 0 };
-                    epochPos.ra  = RA * 15.0;
-                    epochPos.dec = Dec;
-
-                    // Convert from JNow to J2000
-                    ln_get_equ_prec2(&epochPos, ln_get_julian_from_sys(), JD2000, &J2000Pos);
-
-                    J2000RA = J2000Pos.ra / 15.0;
-                    J2000DE = J2000Pos.dec;
-
-                    if (!std::isnan(Latitude) && !std::isnan(Longitude))
-                    {
-                        // Horizontal Coords
-                        INDI::IHorizontalCoordinates horizontalPos;
-                        IGeographicCoordinates observer;
-                        observer.lat = Latitude;
-                        observer.lng = Longitude;
-
-                        ln_get_hrz_from_equ(&epochPos, &observer, ln_get_julian_from_sys(), &horizontalPos);
-                        Airmass = ln_get_airmass(horizontalPos.alt, 750);
-                    }
-                }
-
-                PrimaryCCD.ImageExposureNP.s = IPS_BUSY;
-            }
-            else
-            {
-                DEBUG(Logger::DBG_DEBUG, "Autoloop: Primary CCD Exposure Error!");
-                PrimaryCCD.ImageExposureNP.s = IPS_ALERT;
-            }
-
-            IDSetNumber(&PrimaryCCD.ImageExposureNP, nullptr);
-        }
-        else
-        {
-            GuideCCD.ImageExposureN[0].value = GuiderExposureTime;
-            GuideCCD.ImageExposureNP.s       = IPS_BUSY;
-            if (StartGuideExposure(GuiderExposureTime))
-                GuideCCD.ImageExposureNP.s = IPS_BUSY;
-            else
-            {
-                DEBUG(Logger::DBG_DEBUG, "Autoloop: Guide CCD Exposure Error!");
-                GuideCCD.ImageExposureNP.s = IPS_ALERT;
-            }
-
-            IDSetNumber(&GuideCCD.ImageExposureNP, nullptr);
-        }
-    }
-#endif
+    if (FastExposureToggleS[INDI_ENABLED].s != ISS_ON)
+        targetChip->setExposureComplete();
     return true;
 }
 
 bool CCD::uploadFile(CCDChip * targetChip, const void * fitsData, size_t totalBytes, bool sendImage,
-                     bool saveImage /*, bool useSolver*/)
+                     bool saveImage)
 {
     uint8_t * compressedData = nullptr;
 
@@ -2828,75 +2325,20 @@ bool CCD::uploadFile(CCDChip * targetChip, const void * fitsData, size_t totalBy
     {
         if (!strcmp(targetChip->getImageExtension(), "fits"))
         {
-            int  compressedBytes = 0;
-            char filename[MAXRBUF] = {0};
-            strncpy(filename, "/tmp/compressedfits.fits", MAXRBUF);
-
-            FILE * fp = fopen(filename, "w");
-            if (fp == nullptr)
-            {
-                LOGF_ERROR("Unable to save temporary image file: %s", strerror(errno));
-                return false;
-            }
-
-            int n = 0;
-            for (int nr = 0; nr < static_cast<int>(totalBytes); nr += n)
-                n = fwrite(static_cast<const uint8_t *>(fitsData) + nr, 1, totalBytes - nr, fp);
-            fclose(fp);
-
             fpstate	fpvar;
-            std::vector<std::string> arguments = {"fpack", filename};
-            std::vector<char *> arglist;
-            for (const auto &arg : arguments)
-                arglist.push_back(const_cast<char *>(arg.data()));
-            arglist.push_back(nullptr);
-
-            int argc = arglist.size() - 1;
-            char ** argv = arglist.data();
-
-            // TODO: Check for errors
             fp_init (&fpvar);
-            fp_get_param (argc, argv, &fpvar);
-            fp_preflight (argc, argv, FPACK, &fpvar);
-            fp_loop (argc, argv, FPACK, filename, fpvar);
-
-            // Remove temporary file from disk
-            remove(filename);
-
-            // Add .fz
-            strncat(filename, ".fz", 4);
-
-            struct stat st;
-            stat(filename, &st);
-            compressedBytes = st.st_size;
-
-            compressedData = new uint8_t[compressedBytes];
-
-            if (compressedData == nullptr)
+            size_t compressedBytes = 0;
+            int islossless = 0;
+            if (fp_pack_data_to_data(reinterpret_cast<const char *>(fitsData), totalBytes, &compressedData, &compressedBytes, fpvar,
+                                     &islossless) < 0)
             {
-                LOG_ERROR("Ran out of memory compressing image.");
+                free(compressedData);
+                LOG_ERROR("Error: Ran out of memory compressing image");
                 return false;
             }
-
-            fp = fopen(filename, "r");
-            if (fp == nullptr)
-            {
-                LOGF_ERROR("Unable to open temporary image file: %s", strerror(errno));
-                delete [] compressedData;
-                return false;
-            }
-
-            n = 0;
-            for (int nr = 0; nr < compressedBytes; nr += n)
-                n = fread(compressedData + nr, 1, compressedBytes - nr, fp);
-            fclose(fp);
-
-            // Remove compressed temporary file from disk
-            remove(filename);
 
             targetChip->FitsB.blob    = compressedData;
             targetChip->FitsB.bloblen = compressedBytes;
-            totalBytes = compressedBytes;
             snprintf(targetChip->FitsB.format, MAXINDIBLOBFMT, ".%s.fz", targetChip->getImageExtension());
         }
         else
@@ -2966,6 +2408,73 @@ bool CCD::uploadFile(CCDChip * targetChip, const void * fitsData, size_t totalBy
         delete [] compressedData;
 
     DEBUG(Logger::DBG_DEBUG, "Upload complete");
+
+    return true;
+}
+
+bool CCD::processFastExposure(CCDChip * targetChip)
+{
+    // If fast exposure is on, let's immediately take another capture
+    if (FastExposureToggleS[INDI_ENABLED].s == ISS_ON)
+    {
+        targetChip->setExposureComplete();
+        double duration = targetChip->getExposureDuration();
+
+        // Check fast exposure count
+        if (FastExposureCountN[0].value > 1)
+        {
+            if (UploadS[UPLOAD_LOCAL].s != ISS_ON)
+            {
+                if (FastExposureCountNP.s != IPS_BUSY)
+                {
+                    FastExposureToggleStartup = std::chrono::system_clock::now();
+                }
+                else
+                {
+                    auto end = std::chrono::system_clock::now();
+
+                    m_UploadTime = (std::chrono::duration_cast<std::chrono::milliseconds>(end - FastExposureToggleStartup)).count() / 1000.0 -
+                                   duration;
+                    LOGF_DEBUG("Image download and upload/save took %.3f seconds.", m_UploadTime);
+
+                    FastExposureToggleStartup = end;
+                }
+            }
+
+            FastExposureCountNP.s = IPS_BUSY;
+            FastExposureCountN[0].value--;
+            IDSetNumber(&FastExposureCountNP, nullptr);
+
+            if (UploadS[UPLOAD_LOCAL].s == ISS_ON || m_UploadTime < duration)
+            {
+                if (StartExposure(duration))
+                    PrimaryCCD.ImageExposureNP.s = IPS_BUSY;
+                else
+                    PrimaryCCD.ImageExposureNP.s = IPS_ALERT;
+                if (duration * 1000 < getCurrentPollingPeriod())
+                    setCurrentPollingPeriod(duration * 950);
+            }
+            else
+            {
+                LOGF_ERROR("Rapid exposure not possible since upload time is %.2f seconds while exposure time is %.2f seconds.",
+                           m_UploadTime,
+                           duration);
+                PrimaryCCD.ImageExposureNP.s = IPS_ALERT;
+                IDSetNumber(&PrimaryCCD.ImageExposureNP, nullptr);
+                FastExposureCountN[0].value = 1;
+                FastExposureCountNP.s = IPS_IDLE;
+                IDSetNumber(&FastExposureCountNP, nullptr);
+                m_UploadTime = 0;
+                return false;
+            }
+        }
+        else
+        {
+            m_UploadTime = 0;
+            FastExposureCountNP.s = IPS_IDLE;
+            IDSetNumber(&FastExposureCountNP, nullptr);
+        }
+    }
 
     return true;
 }

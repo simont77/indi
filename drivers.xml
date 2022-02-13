@@ -19,7 +19,7 @@
         </device>
         <device label="LX200 OnStep" manufacturer="OnStep">
             <driver name="LX200 OnStep">indi_lx200_OnStep</driver>
-            <version>1.12</version>
+            <version>1.13</version>
         </device>
         <device label="LX200 TeenAstro" manufacturer="TeenAstro">
             <driver name="LX200 TeenAstro">indi_lx200_TeenAstro</driver>
@@ -49,18 +49,18 @@
             <driver name="EQ500X">indi_eq500x_telescope</driver>
             <version>1.0</version>
         </device>
-        <device label="AstroPhysics Experimental" manufacturer="Astrophysics">
-            <driver name="AstroPhysics Experimental">indi_lx200ap_experimental</driver>
-            <version>1.0</version>
-        </device>
-        <device label="AstroPhysics GTOCP2" manufacturer="Astrophysics">
-            <driver name="AstroPhysics GTOCP2">indi_lx200ap_gtocp2</driver>
-            <version>1.0</version>
-        </device>
         <device label="AstroPhysics" manufacturer="Astrophysics">
             <driver name="AstroPhysics">indi_lx200ap</driver>
             <version>1.0</version>
         </device>
+        <device label="ZWO AM5" manufacturer="ZWO">
+            <driver name="LX200 Autostar">indi_lx200autostar</driver>
+            <version>2.1</version>
+        </device>
+        <device label="AstroPhysics GTOCP2" manufacturer="Astrophysics">
+            <driver name="AstroPhysics GTOCP2">indi_lx200ap_gtocp2</driver>
+            <version>1.0</version>
+        </device>        
         <device label="Celestron GPS" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
@@ -159,19 +159,19 @@
         </device>
         <device label="iOptron CEM26" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="iOptron GEM28" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="iOptron CEM40" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="iOptron GEM45" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="iOptron iEQ45 Pro" manufacturer="iOptron">
             <driver name="iEQ">indi_ieq_telescope</driver>
@@ -211,15 +211,15 @@
         </device>
         <device label="iOptron v3" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="iOptron CEM120" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="iOptron CEM70" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.4</version>
+            <version>1.5</version>
         </device>
         <device label="Pulsar2" manufacturer="GTD">
             <driver name="Pulsar2">indi_lx200pulsar2</driver>
@@ -241,13 +241,9 @@
             <driver name="Skywatcher Alt-Az">indi_skywatcherAltAzMount</driver>
             <version>1.3</version>
         </device>
-        <device label="Skywatcher Star Adventurer" manufacturer="SkyWatcher">
+        <device label="Star Adventurer" manufacturer="SkyWatcher">
             <driver name="Telescope Simulator">indi_simulator_telescope</driver>
             <version>1.0</version>
-        </device>
-        <device label="Skywatcher Star Adventurer WiFi" manufacturer="SkyWatcher">
-            <driver name="Skywatcher Alt-Az">indi_skywatcherAltAzMount</driver>
-            <version>1.3</version>
         </device>
         <device label="AZ-GTi Alt-Az WiFi" manufacturer="SkyWatcher">
             <driver name="Skywatcher Alt-Az">indi_skywatcherAltAzMount</driver>
@@ -289,7 +285,7 @@
         </device>
         <device label="Shoestring Astronomy FCUSB" manufacturer="Shoestring">
             <driver name="FCUSB">indi_fcusb_focus</driver>
-            <version>0.2</version>
+            <version>0.3</version>
         </device>
         <device label="Celestron SCT" manufacturer="Celestron">
             <driver name="Celestron SCT">indi_celestron_sct_focus</driver>
@@ -315,7 +311,11 @@
             <driver name="Rigelsys NStep">indi_nstep_focus</driver>
             <version>1.2</version>
         </device>
-          <device label="RBFocus" manufacturer="RBFocus">
+        <device label="Rigelsys nFrame" manufacturer="Rigel Systems">
+            <driver name="Rigelsys nFrame">indi_nstep_rotator</driver>
+            <version>1.0</version>
+        </device>
+        <device label="RBFocus" manufacturer="RBFocus">
             <driver name="RBFocus">indi_rbfocus_focus</driver>
             <version>1.2</version>
         </device>
@@ -329,7 +329,7 @@
         </device>
         <device label="MyFocuserPro2" manufacturer="DIY">
             <driver name="MyFocuserPro2">indi_myfocuserpro2_focus</driver>
-            <version>0.7</version>
+            <version>1.0</version>
         </device>
         <device label="DeepSkyDad AF1" manufacturer="DeepSkyDad">
             <driver name="DeepSkyDad AF1">indi_deepskydad_af1_focus</driver>
