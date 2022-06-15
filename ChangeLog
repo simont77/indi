@@ -1,3 +1,69 @@
++ From 1.9.5 to 1.9.6
+
+    63d41777 2022-05-20 Michal Jamry         Fix pyindi pipeline (#1660)
+    f477093d 2022-05-20 Jasem Mutlaq         Fix MacOS error
+    c0021969 2022-05-07 WandererAstro        Driver for WandererRotatorLite added (#1657)
+    f5bac914 2022-05-05 François Desvallées  Allow any guide rate between 0.1x and 1x (#1656)
+    d719724c 2022-04-12 Jasem Mutlaq         Add native support for reversing Motion NS and WE directional keys
+    8ae25029 2022-04-08 murveit              Remove user choice for CM/CMR. (#1654)
+    13906846 2022-04-07 murveit              Add mount status. Start CP5 (#1653)
+    19956ec4 2022-04-03 Alain                UTC uninitialized structure fix by Norikyu (#1652)
+    e947175a 2022-04-03 Jasem Mutlaq         Make tracking factor configurable
+    4aa5f0eb 2022-03-31 murveit              fix issue reading worm position (#1651)
+    aca6a902 2022-03-31 murveit              Terminate commands missing #, introduce PEC recording and status, rem… (#1648)
+    b3c9e1eb 2022-03-31 Jim                  1.9.6_spec: update spec to build 1.9.6git (#1650)
+    5fc42420 2022-03-31 Jasem Mutlaq         Fix few issues related to commands needing space in lx200 ZEQ driver
+    1d453be5 2022-03-26 Jasem Mutlaq         Flush IO before sending command
+    e04bf987 2022-03-24 Jasem Mutlaq         use capture format
+    e0158b46 2022-03-21 Jasem Mutlaq         INDI v1.9.6 development cycle
+    fd391d51 2022-03-21 Alain                Fixing UTC Offset format allowing :SGHH:MM# where MM can be 00, 30 and 45 (#1644)
+    658ed77c 2022-03-13 murveit              Change driver name. Allow ParkTo & UnparkFrom to be visible before co… (#1642)
+    78196d41 2022-03-13 Jasem Mutlaq         Bump version
+    3f66b577 2022-03-12 murveit              add lastparked logic (#1639)
+    1ea97f03 2022-03-11 Jasem Mutlaq         Call handshake on simulation
+    8beeeb9c 2022-03-10 Jasem Mutlaq         Some mounts like iOptron require space in Sr and Sd commands otherwise it would not work
+    dfcd2922 2022-03-10 Jasem Mutlaq         Previous one did not work
+    74532f9c 2022-03-10 Jasem Mutlaq         Add endianess test for Windows
+    604776da 2022-03-10 Jasem Mutlaq         Fix compile on Windows
+    679d6a80 2022-03-08 Jasem Mutlaq         INDI v1.9.5 change log
+    fc5f5dc6 2022-03-08 Sophie Taylor        Remove incorrect documentation (#1637)
+
++ From 1.9.4 to 1.9.5
+
+    4f9db311 2022-03-05 Jasem Mutlaq         Fix typo
+    5404ea48 2022-03-03 ChristianHen         Add Driver for Esatto with Arco (goto, abort, sync, cal) (#1634)
+    0d60077b 2022-03-03 Sophie Taylor        Add CEM70(G)-EC identifier and a deprecation note (#1632)
+    ec1e0f2a 2022-02-27 Jasem Mutlaq         Fix LAN search
+    be7df23b 2022-02-24 Patrick Chevalley    Update driver interface when the LX200 support a focuser (#1631)
+    26bbbc0c 2022-02-21 Jasem Mutlaq         Do not add duplicates
+    5098be43 2022-02-21 Jasem Mutlaq         Save config state after update
+    d521e0ab 2022-02-21 Jasem Mutlaq         Simplify labels
+    e5e0c46d 2022-02-20 Mattia Procopio      Add libtheora-dev to pre-requisites (#1627)
+    738b078c 2022-02-20 Jasem Mutlaq         Initial implementation for capture format and encode format (#1630)
+    45abfcba 2022-02-19 Jasem Mutlaq         Add OpenAstroGuider
+    0afce1ce 2022-02-19 Jasem Mutlaq         Introduce 100 milli-arc-seconds threshold for sending updated coordinates to clients. This is safer than double comparisions
+    6fa57512 2022-02-16 murveit              Fix similar negative sign bug in AP driver (#1626)
+    f479114a 2022-02-15 murveit              Fix but setting AP UTC (#1625)
+    76bcbcdc 2022-02-11 Lauren Glina         Fix Celestron focuser crash after calibration (#1622)
+    37577745 2022-02-07 murveit              Updated version of the AstroPhysics driver--for testing (#1620)
+    7df8ca6d 2022-02-06 Sam James            Use <stdint.h> for uint* types (fix build on musl) (#1618)
+    505ba932 2022-02-03 naheedsa             Add Pier Side Status for lx200zeq25 (#1612)
+    5fc82166 2022-02-03 d33psky              Add and apply Meade Protocol spec definitions (#1609)
+    29056dfe 2022-01-30 rlancasteAstro       Fixing a build error on Older MacOS (#1611)
+    c5b45c7a 2022-01-30 Sifan                Adding new NexDome Beaver INDI driver (#1607)
+    18689217 2022-01-30 Alain                Allow Minutes Past Meridia +/- 180° (#1606)
+    f11f4a5d 2022-01-26 d33psky              Fix setObjectRA and setObjectDEC for short and long format and longer format for issue #1604 (#1605)
+    72b9b6a7 2022-01-25 Jasem Mutlaq         libindi v1.9.5 cycle
+    7bfb6b4b 2022-01-25 Jasem Mutlaq         Increase range for temperature settings
+    ae510cc4 2022-01-23 Jasem Mutlaq         Do not use focuser in guide simulator
+    de4f4b6e 2022-01-23 Michal Jamry         Pyindi - run actual tests (#1602)
+    ecdfb6b7 2022-01-22 Jasem Mutlaq         Use INDI functions to parse the coordinate set
+    d15412cd 2022-01-21 Jasem Mutlaq         Using network connection, setting default hostname and port should not override config values
+    41f3306b 2022-01-19 Jim                  spec-195: update the spec file for 1.9.5 builds (#1601)
+    4afd3c7c 2022-01-18 Paolo Stivanin       Add missing find_package for Qt5Core (#1599)
+    1d4deda0 2022-01-17 Jasem Mutlaq         Make INDI compile on 18.04
+    a7649451 2022-01-17 François Desvallées  Fixed updating of slew rate (#1598)
+
 + From 1.9.3 to 1.9.4
 
     6e82671c 2022-01-17 nouspiro             Send command at start to flush serial line for Pulsar/Rigel dome (#1596)
@@ -1331,4 +1397,4 @@ From v0.2 to v0.3:
                 + INDI scripting tools
                 + Various bug fixing
 
-INDI Library v1.1 conforms to INDI wire protocol v1.7
+INDI Library v1.9.5 conforms to INDI wire protocol v1.7
