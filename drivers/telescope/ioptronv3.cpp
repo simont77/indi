@@ -802,8 +802,8 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
             return true;
         }
         
-        /******************************************************/
-         * Meridian Action Operations
+        /******************************************************
+        * Meridian Action Operations
         *******************************************************/
         if (!strcmp(name, MeridianActionSP.name))
         {
