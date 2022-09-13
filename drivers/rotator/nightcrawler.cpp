@@ -46,11 +46,11 @@ static std::unique_ptr<NightCrawler> tommyGoodBoy(new NightCrawler());
 
 NightCrawler::NightCrawler() : RotatorInterface(this)
 {
-    setVersion(1, 3);
+    setVersion(1, 5);
 
     // Can move in Absolute & Relative motions, can AbortFocuser motion, and has variable speed.
     FI::SetCapability(FOCUSER_CAN_ABS_MOVE | FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT);
-    RI::SetCapability(ROTATOR_CAN_ABORT | ROTATOR_CAN_HOME | ROTATOR_CAN_SYNC);
+    RI::SetCapability(ROTATOR_CAN_ABORT | ROTATOR_CAN_HOME | ROTATOR_CAN_SYNC | ROTATOR_CAN_REVERSE);
 }
 
 bool NightCrawler::initProperties()
@@ -317,24 +317,24 @@ bool NightCrawler::getFocuserType()
 
     if (strcmp(resp, "2.5 NC") == 0)
     {
-        RotatorAbsPosN[0].min = 0;
-        RotatorAbsPosN[0].max = NC_25_STEPS;
+        RotatorAbsPosN[0].min = -NC_25_STEPS / 2.0;
+        RotatorAbsPosN[0].max = NC_25_STEPS / 2.0;
         m_RotatorStepsPerRevolution = NC_25_STEPS;
     }
     else if (strcmp(resp, "3.0 NC") == 0)
     {
-        RotatorAbsPosN[0].min = 0;
-        RotatorAbsPosN[0].max = NC_30_STEPS;
+        RotatorAbsPosN[0].min = -NC_30_STEPS / 2.0;
+        RotatorAbsPosN[0].max = NC_30_STEPS / 2.0;
         m_RotatorStepsPerRevolution = NC_30_STEPS;
     }
     else
     {
-        RotatorAbsPosN[0].min = 0;
-        RotatorAbsPosN[0].max = NC_35_STEPS;
+        RotatorAbsPosN[0].min = -NC_35_STEPS / 2.0;
+        RotatorAbsPosN[0].max = NC_35_STEPS / 2.0;
         m_RotatorStepsPerRevolution = NC_35_STEPS;
     }
 
-    m_RotatorTicksPerDegree = static_cast<uint32_t>(floor(RotatorAbsPosN[0].max / 360.0));
+    m_RotatorTicksPerDegree = m_RotatorStepsPerRevolution / 360.0;
 
     return true;
 }
@@ -771,20 +771,23 @@ void NightCrawler::TimerHit()
         }
     }
     rc = getPosition(MOTOR_ROTATOR);
-    // Sometimes Rotator motor returns negative result, we must sync it.
-    if (RotatorAbsPosN[0].value < 0 || RotatorAbsPosN[0].value > m_RotatorStepsPerRevolution)
+    // If absolute position is zero, we must sync to 180 degrees so we can rotate in both directions freely.
+    // Also sometimes Rotator motor returns negative result, we must sync it to 180 degrees as well.
+    while (RotatorAbsPosN[0].value < -m_RotatorStepsPerRevolution || RotatorAbsPosN[0].value > m_RotatorStepsPerRevolution)
     {
-        // 180 degress so that we can move right or left
-        // at 0 we'd be forced to make 360 degrees rotation to reach 1 degree CW of zero position.
-        const auto newOffset = static_cast<uint32_t>(RotatorAbsPosN[0].value) % m_RotatorStepsPerRevolution;
+        // Update value to take care of multiple rotations.
+        const auto newOffset = static_cast<int32_t>(RotatorAbsPosN[0].value) % m_RotatorStepsPerRevolution;
+        LOGF_INFO("Out of bounds value detected. Syncing rotator position to %d", newOffset);
         syncMotor(MOTOR_ROTATOR, newOffset);
-        LOGF_WARN("Bogus motor position received: %d. Syncing rotator to %d", RotatorAbsPosN[0].value, newOffset);
         rc = getPosition(MOTOR_ROTATOR);
     }
     if (rc && std::abs(RotatorAbsPosN[0].value - lastRotatorPosition) > NIGHTCRAWLER_THRESHOLD)
     {
         lastRotatorPosition = RotatorAbsPosN[0].value;
-        GotoRotatorN[0].value = range360(RotatorAbsPosN[0].value / m_RotatorTicksPerDegree);
+        if (ReverseRotatorS[INDI_ENABLED].s == ISS_ON)
+            GotoRotatorN[0].value = range360(360 - (RotatorAbsPosN[0].value / m_RotatorTicksPerDegree));
+        else
+            GotoRotatorN[0].value = range360(RotatorAbsPosN[0].value / m_RotatorTicksPerDegree);
         absRotatorUpdated = true;
     }
     if (absRotatorUpdated)
@@ -1334,6 +1337,7 @@ bool NightCrawler::setSleepBrightness(uint8_t value)
 bool NightCrawler::saveConfigItems(FILE *fp)
 {
     Focuser::saveConfigItems(fp);
+    RI::saveConfigItems(fp);
 
     IUSaveConfigNumber(fp, &BrightnessNP);
     IUSaveConfigNumber(fp, &FocusStepDelayNP);
@@ -1365,21 +1369,19 @@ IPState NightCrawler::HomeRotator()
 
 IPState NightCrawler::MoveRotator(double angle)
 {
-    // Find shortest distance given target degree
-    double a = angle;
-    double b = GotoRotatorN[0].value;
-    double d = fabs(a - b);
-    double r = (d > 180) ? 360 - d : d;
-    int sign = (a - b >= 0 && a - b <= 180) || (a - b <= -180 && a - b >= -360) ? 1 : -1;
+    // Rotator move 0 to +180 degrees CCW
+    // Rotator move 0 to -180 degrees CW
+    // This is from looking at rotator from behind.
+    const bool isReversed = ReverseRotatorS[INDI_ENABLED].s == ISS_ON;
+    auto newAngle = ( angle > 180 ? angle - 360 : angle);
+    if (isReversed)
+        newAngle *= -1;
 
-    r *= sign;
-
-    double newTarget = (r + b) * m_RotatorTicksPerDegree;
-
+    auto newTarget = newAngle * m_RotatorTicksPerDegree;
     if (newTarget < RotatorAbsPosN[0].min)
-        newTarget -= RotatorAbsPosN[0].min;
+        newTarget = RotatorAbsPosN[0].min;
     else if (newTarget > RotatorAbsPosN[0].max)
-        newTarget -= RotatorAbsPosN[0].max;
+        newTarget = RotatorAbsPosN[0].max;
 
     bool rc = gotoMotor(MOTOR_ROTATOR, static_cast<int32_t>(newTarget));
 
@@ -1395,21 +1397,16 @@ IPState NightCrawler::MoveRotator(double angle)
 
 bool NightCrawler::SyncRotator(double angle)
 {
-    // Find shortest distance given target degree
-    double a = angle;
-    double b = GotoRotatorN[0].value;
-    double d = fabs(a - b);
-    double r = (d > 180) ? 360 - d : d;
-    int sign = (a - b >= 0 && a - b <= 180) || (a - b <= -180 && a - b >= -360) ? 1 : -1;
+    const bool isReversed = ReverseRotatorS[INDI_ENABLED].s == ISS_ON;
+    auto newAngle = ( angle > 180 ? angle - 360 : angle);
+    if (isReversed)
+        newAngle *= -1;
 
-    r *= sign;
-
-    double newTarget = (r + b) * m_RotatorTicksPerDegree;
-
+    auto newTarget = newAngle * m_RotatorTicksPerDegree;
     if (newTarget < RotatorAbsPosN[0].min)
-        newTarget -= RotatorAbsPosN[0].min;
+        newTarget = RotatorAbsPosN[0].min;
     else if (newTarget > RotatorAbsPosN[0].max)
-        newTarget -= RotatorAbsPosN[0].max;
+        newTarget = RotatorAbsPosN[0].max;
 
     return syncMotor(MOTOR_ROTATOR, static_cast<int32_t>(newTarget));
 }
@@ -1424,4 +1421,15 @@ bool NightCrawler::AbortRotator()
     }
 
     return rc;
+}
+
+bool NightCrawler::ReverseRotator(bool enabled)
+{
+    // Immediately update the angle after reverse is set.
+    if (enabled)
+        GotoRotatorN[0].value = range360(360 - (RotatorAbsPosN[0].value / m_RotatorTicksPerDegree));
+    else
+        GotoRotatorN[0].value = range360(RotatorAbsPosN[0].value / m_RotatorTicksPerDegree);
+    IDSetNumber(&GotoRotatorNP, nullptr);
+    return true;
 }

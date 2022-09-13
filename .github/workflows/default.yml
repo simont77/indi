@@ -1,5 +1,13 @@
 name: Linux
-on: [push, pull_request, workflow_dispatch]
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+    branches:
+      - 'master'
 
 jobs:
   build:
@@ -8,10 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container: ["ubuntu", "debian", "fedora"]
+        container: ["ubuntu", "debian"] # Temporary remove "fedora", until gcc 12.1.1-3 lands
 
     container:
-      image: ghcr.io/indilib/${{ matrix.container }}
+      image: ghcr.io/${{ github.repository_owner }}/${{ matrix.container }}
 
     steps:
       - name: Get INDI Sources

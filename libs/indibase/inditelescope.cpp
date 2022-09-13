@@ -214,7 +214,8 @@ bool Telescope::initProperties()
     // Reverse NS or WE
     ReverseMovementSP[REVERSE_NS].fill("REVERSE_NS", "North/South", ISS_OFF);
     ReverseMovementSP[REVERSE_WE].fill("REVERSE_WE", "West/East", ISS_OFF);
-    ReverseMovementSP.fill(getDeviceName(), "TELESCOPE_REVERSE_MOTION", "Reverse", MOTION_TAB, IP_RW, ISR_NOFMANY, 60, IPS_IDLE);
+    ReverseMovementSP.fill(getDeviceName(), "TELESCOPE_REVERSE_MOTION", "Reverse", MOTION_TAB, IP_RW, ISR_NOFMANY, 60,
+                           IPS_IDLE);
 
     IUFillNumber(&ScopeParametersN[0], "TELESCOPE_APERTURE", "Aperture (mm)", "%g", 10, 5000, 0, 0.0);
     IUFillNumber(&ScopeParametersN[1], "TELESCOPE_FOCAL_LENGTH", "Focal Length (mm)", "%g", 10, 10000, 0, 0.0);
@@ -2070,9 +2071,10 @@ const char *Telescope::LoadParkXML()
     ParkdeviceXml        = parkxml;
     ParkstatusXml        = findXMLEle(parkxml, "parkstatus");
     ParkpositionXml      = findXMLEle(parkxml, "parkposition");
-    ParkpositionAxis1Xml = findXMLEle(ParkpositionXml, "axis1position");
-    ParkpositionAxis2Xml = findXMLEle(ParkpositionXml, "axis2position");
-
+    if (ParkpositionXml)
+        ParkpositionAxis1Xml = findXMLEle(ParkpositionXml, "axis1position");
+    if (ParkpositionXml)
+        ParkpositionAxis2Xml = findXMLEle(ParkpositionXml, "axis2position");
 
     if (ParkstatusXml == nullptr || ParkpositionAxis1Xml == nullptr || ParkpositionAxis2Xml == nullptr)
     {

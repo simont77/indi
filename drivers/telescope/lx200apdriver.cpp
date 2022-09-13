@@ -405,9 +405,9 @@ int getAPWormPosition(int fd, int *position)
     return -1;
 }
 
-int selectAPMoveToRate(int fd, int moveToRate)
+int selectAPMoveToRate(int fd, int moveToIndex)
 {
-    switch (moveToRate)
+    switch (moveToIndex)
     {
         case 0:
             return sendAPCommand(fd, "#:RC0#", "selectAPMoveToRate: Setting move to rate to 12x");
@@ -423,16 +423,16 @@ int selectAPMoveToRate(int fd, int moveToRate)
     return 0;
 }
 
-int selectAPSlewRate(int fd, int slewRate)
+int selectAPSlewRate(int fd, int slewIndex)
 {
-    switch (slewRate)
+    switch (slewIndex)
     {
         case 0:
-            return sendAPCommand(fd, "#:RS0#", "selectAPSlewRate: Setting slew to rate to 600x");
+            return sendAPCommand(fd, "#:RS0#", "selectAPSlewRate: Setting slew to rate to index 0");
         case 1:
-            return sendAPCommand(fd, "#:RS1#", "selectAPSlewRate: Setting slew to rate to 900x");
+            return sendAPCommand(fd, "#:RS1#", "selectAPSlewRate: Setting slew to rate to index 1");
         case 2:
-            return sendAPCommand(fd, "#:RS2#", "selectAPSlewRate: Setting slew to rate to 1200x");
+            return sendAPCommand(fd, "#:RS2#", "selectAPSlewRate: Setting slew to rate to index 2");
         default:
             return -1;
     }
@@ -706,9 +706,9 @@ int APUnParkMount(int fd)
 // and is required some the experimental AP driver properly handles
 // pulse guide requests over 999ms by simulated it by setting the move rate
 // to GUIDE and then starting and halting a move of the correct duration.
-int selectAPCenterRate(int fd, int centerRate)
+int selectAPCenterRate(int fd, int centerIndex)
 {
-    switch (centerRate)
+    switch (centerIndex)
     {
         case 0:
             return sendAPCommand(fd, "#:RG#", "selectAPMoveToRate: Setting move to rate to GUIDE");
@@ -722,6 +722,38 @@ int selectAPCenterRate(int fd, int centerRate)
             return sendAPCommand(fd, "#:RC3#", "selectAPMoveToRate: Setting move to rate to 1200x");
         default:
             return -1;
+    }
+    return 0;
+}
+
+int selectAPV2CenterRate(int fd, int centerIndex, APRateTableState rateTable)
+{
+    if (rateTable == AP_RATE_TABLE_DEFAULT) // If no rate table, do as we always have
+        return selectAPCenterRate(fd, centerIndex);
+
+    else
+    {
+        switch (centerIndex)
+        {
+            case 0:
+                return sendAPCommand(fd, "#:RC5#", "selectAPMoveToRate: Setting center rate to 0.25x");
+            case 1:
+                return sendAPCommand(fd, "#:RC6#", "selectAPMoveToRate: Setting center rate to 0.5x");
+            case 2:
+                return sendAPCommand(fd, "#:RC7#", "selectAPMoveToRate: Setting center rate to 1.0x");
+            case 3:
+                return sendAPCommand(fd, "#:RC0#", "selectAPMoveToRate: Setting center rate to 12");
+            case 4:
+                return sendAPCommand(fd, "#:RC1#", "selectAPMoveToRate: Setting center rate to 64x");
+            case 5:
+                return sendAPCommand(fd, "#:RC2#", "selectAPMoveToRate: Setting center rate to 200x");
+            case 6:
+                return sendAPCommand(fd, "#:RC3#", "selectAPMoveToRate: Setting center rate to index 3");
+            case 7:
+                return sendAPCommand(fd, "#:RC4#", "selectAPMoveToRate: Setting center rate to index 4");
+            default:
+                return -1;
+        }
     }
     return 0;
 }
@@ -887,6 +919,119 @@ bool apStatusSlewing(const char *statusString)
 {
     return statusString[3] !=  '0';
 }
+
+// The 14th character in the status string "N" tells up about the rate table.
+APRateTableState apRateTable(const char *statusString)
+{
+    if (strlen(statusString) >= 14)
+    {
+        switch (statusString[13])
+        {
+            case '0':
+                return AP_RATE_TABLE_0;
+                break;
+            case '1':
+                return AP_RATE_TABLE_1;
+                break;
+            case '2':
+                return AP_RATE_TABLE_2;
+                break;
+            case '3':
+                return AP_RATE_TABLE_3;
+                break;
+            default:
+                return AP_RATE_TABLE_DEFAULT;
+                break;
+        }
+    }
+    return AP_RATE_TABLE_DEFAULT;
+}
+
+
+// Doc for the :G_E command fom A-P:
+// Note that for CP3, must send G control-E but CP4 and CP5 will also accept G_E.
+// This function just sends the G control-E which should work for all three controllers.
+//
+// Get Mount Features
+// Command:	:G<cntl>E#
+// Response:	xxxx#
+// History:		All firmware versions
+// Gets the bit mask associated with mount features.
+// Bit Weighting  Meaning
+// 0      1       Mount Type:  0 = Equatorial Mount, 1 = Fork Mount
+// 1      2       0 = Normal Speed Range, 2 = Slew Scaling on Standard Rates ( >= 600x)
+//                This function has been eliminated beginning P02-01, in favor of the rate tables.
+// 2      4       0 = Encoders not Supported, 4 = Encoders Supported
+// 3-5            Bit encoded indication of what encoder types are supported
+// 6     64       Motor Type:  0 = Servo Motors, 64 = Stepper Motors
+// 7    128       Encoder Reference: 0 = Clutch Dependent, 128 = Clutch Independent (ex. Mach2GTO)
+//                This bit is only meaningful if bit 2 is set.
+// 8    256       0 = Modeling not Enabled, 256 = Modeling Enabled,
+//                This bit is only meaningful in the GTOCP4, as modeling is always enabled in the GTOCP5,
+//                and isn’t available for the GTOCP1-3
+// 9-31           (reserved for future use)
+int getApMountFeatures(int fd, bool *hasEncoder, bool *clutchAware)
+{
+    bool complain = false;
+    int nbytes_write = 0;
+    int nbytes_read  = 0;
+    constexpr int RB_MAX_LEN = 256;
+    char readBuffer[RB_MAX_LEN];
+    *hasEncoder = false;
+    *clutchAware = false;
+
+    if (fd <= 0)
+    {
+        if (complain) DEBUGDEVICE(lx200ap_name, INDI::Logger::DBG_ERROR,
+                                      "getApStatusString: not a valid file descriptor received");
+        return TTY_READ_ERROR;
+    }
+
+    int res = sendAPCommand(fd, "#:G\005#", "getApStatusString");
+    if (res != TTY_OK)
+    {
+        if (complain) DEBUGFDEVICE(lx200ap_name, INDI::Logger::DBG_ERROR,
+                                       "getApMountFeatures: unsuccessful write to telescope, %d", nbytes_write);
+        return res;
+    }
+
+    tty_read_section(fd, readBuffer, '#', LX200_TIMEOUT, &nbytes_read);
+    tcflush(fd, TCIFLUSH);
+    if (nbytes_read > 1)
+    {
+        readBuffer[nbytes_read - 1] = '\0';
+
+        DEBUGFDEVICE(lx200ap_name, INDI::Logger::DBG_DEBUG, "getApMountFeatures: received bytes %d, [%s]",
+                     nbytes_write, readBuffer);
+        int value;
+        if (sscanf(readBuffer, "%d", &value) > 0)
+        {
+            *hasEncoder = value & 4;
+            *clutchAware = value & 128;
+        }
+
+        return TTY_OK;
+    }
+
+    if (complain) DEBUGDEVICE(lx200ap_name, INDI::Logger::DBG_ERROR, "getApReadBuffer: wrote, but nothing received.");
+
+    return TTY_READ_ERROR;
+}
+
+bool apCanHome(int fd)
+{
+    bool hasEncoder = false;
+    bool clutchAware = false;
+    return (getApMountFeatures(fd, &hasEncoder, &clutchAware) == TTY_OK) &&
+           hasEncoder && clutchAware;
+}
+
+// This would just work with a clutch-aware encoder mount running a CP5. Currently only Mach2.
+int apHomeAndSync(int fd)
+{
+    return sendAPCommand(fd, "#$HA#", "AP Home and Sync");
+}
+
 int isAPInitialized(int fd, bool *isInitialized)
 {
     constexpr int RB_MAX_LEN = 256;

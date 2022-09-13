@@ -53,6 +53,7 @@ Horizon check during slewing functions :ho# and :hq#
 #include <cstring>
 #include <unistd.h>
 #include <termios.h>
+#include <regex>
 
 // PEC Recording values
 enum APPECRecordingState
@@ -72,9 +73,12 @@ enum APPECRecordingState
 LX200AstroPhysicsV2::LX200AstroPhysicsV2() : LX200Generic()
 {
     setLX200Capability(LX200_HAS_PULSE_GUIDING);
+    // The 5 means there are 5 slew rates.
     SetTelescopeCapability(GetTelescopeCapability() | TELESCOPE_HAS_PIER_SIDE | TELESCOPE_HAS_PEC | TELESCOPE_CAN_CONTROL_TRACK
                            | TELESCOPE_HAS_TRACK_RATE, 5);
 
+    majorVersion = 0;
+    minorVersion = 0;
     setVersion(1, 1);
 }
 
@@ -121,26 +125,18 @@ bool LX200AstroPhysicsV2::initProperties()
     TrackRateN[AXIS_DE].min = -998.9999;
     TrackRateN[AXIS_DE].max = 998.9999;
 
-    // Motion speed of axis when pressing NSWE buttons
-    IUFillSwitch(&SlewRateS[0], "1", "Guide", ISS_OFF);
-    IUFillSwitch(&SlewRateS[1], "12", "12x", ISS_OFF);
-    IUFillSwitch(&SlewRateS[2], "64", "64x", ISS_ON);
-    IUFillSwitch(&SlewRateS[3], "600", "600x", ISS_OFF);
-    IUFillSwitch(&SlewRateS[4], "1200", "1200x", ISS_OFF);
-    IUFillSwitchVector(&SlewRateSP, SlewRateS, 5, getDeviceName(), "TELESCOPE_SLEW_RATE", "Slew Rate", MOTION_TAB, IP_RW,
-                       ISR_1OFMANY, 0, IPS_IDLE);
+    // Rates populated in a different routine since they can change after connect:
+    initRateLabels();
+
+    // Home button for clutch aware mounts with encoders.
+    IUFillSwitch(&HomeAndReSyncS[0], "Home and ReSync", "Home and ReSync", ISS_OFF);
+    IUFillSwitchVector(&HomeAndReSyncSP, HomeAndReSyncS, 1, getDeviceName(), "HOME_AND_RESYNC",
+                       "HomeAndReSync", MAIN_CONTROL_TAB, IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
     // Manual-set-mount-to-parked button for recovering from issues.
     IUFillSwitch(&ManualSetParkedS[0], "MANUAL SET PARKED", "Manual Set Parked", ISS_OFF);
     IUFillSwitchVector(&ManualSetParkedSP, ManualSetParkedS, 1, getDeviceName(), "MANUAL_SET_PARKED",
                        "ManualSetParked", MAIN_CONTROL_TAB, IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
-
-    // Slew speed when performing regular GOTO
-    IUFillSwitch(&APSlewSpeedS[0], "600", "600x", ISS_ON);
-    IUFillSwitch(&APSlewSpeedS[1], "900", "900x", ISS_OFF);
-    IUFillSwitch(&APSlewSpeedS[2], "1200", "1200x", ISS_OFF);
-    IUFillSwitchVector(&APSlewSpeedSP, APSlewSpeedS, 3, getDeviceName(), "GOTO Rate", "", MOTION_TAB, IP_RW, ISR_1OFMANY,
-                       0, IPS_IDLE);
 
     IUFillSwitch(&SwapS[0], "NS", "North/South", ISS_OFF);
     IUFillSwitch(&SwapS[1], "EW", "East/West", ISS_OFF);
@@ -214,6 +210,59 @@ bool LX200AstroPhysicsV2::initProperties()
     return true;
 }
 
+void LX200AstroPhysicsV2::initRateLabels()
+{
+    if (rateTable == AP_RATE_TABLE_DEFAULT) // Legacy, pre P02-01
+    {
+        // Motion speed of axis when pressing NSWE buttons
+        IUFillSwitch(&SlewRateS[0], "1", "Guide", ISS_OFF);
+        IUFillSwitch(&SlewRateS[1], "12", "12x", ISS_OFF);
+        IUFillSwitch(&SlewRateS[2], "64", "64x", ISS_ON);
+        IUFillSwitch(&SlewRateS[3], "600", "600x", ISS_OFF);
+        IUFillSwitch(&SlewRateS[4], "1200", "1200x", ISS_OFF);
+        IUFillSwitchVector(&SlewRateSP, SlewRateS, 5, getDeviceName(), "TELESCOPE_SLEW_RATE", "Slew Rate", MOTION_TAB, IP_RW,
+                           ISR_1OFMANY, 0, IPS_IDLE);
+
+        // Slew speed when performing regular GOTO
+        IUFillSwitch(&APSlewSpeedS[0], "600", "600x", ISS_ON);
+        IUFillSwitch(&APSlewSpeedS[1], "900", "900x", ISS_OFF);
+        IUFillSwitch(&APSlewSpeedS[2], "1200", "1200x", ISS_OFF);
+        IUFillSwitchVector(&APSlewSpeedSP, APSlewSpeedS, 3, getDeviceName(), "GOTO Rate", "", MOTION_TAB, IP_RW, ISR_1OFMANY,
+                           0, IPS_IDLE);
+    }
+    else
+    {
+        // This is the rate table straight out of the CPx source.  First two numbers
+        // are the highest two center/button rates, and the next three numbers are the
+        // three 'goto' rates.  There are 4 sets of rates for 4 different types of mounts.
+        std::string standard_rates[4][5] =
+        {
+            { "600", "1200", "600", "900",  "1200" },
+            { "500", "900",  "400", "650",  "900"  },
+            { "400", "600",  "300", "450",  "600"  },
+            { "600", "1200", "600", "1000", "1800" }
+        };
+
+        // The 8 means there are 8 slew/center rates.
+        SetTelescopeCapability(GetTelescopeCapability() | TELESCOPE_HAS_PIER_SIDE | TELESCOPE_HAS_PEC | TELESCOPE_CAN_CONTROL_TRACK
+                               | TELESCOPE_HAS_TRACK_RATE, 8);
+        int i = rateTable;
+        IUFillSwitch(&SlewRateS[0], "0.25", "0.25x", ISS_OFF);
+        IUFillSwitch(&SlewRateS[1], "0.5",  "0.5x",  ISS_OFF);
+        IUFillSwitch(&SlewRateS[2], "1.0",  "1.0x",  ISS_OFF);
+        IUFillSwitch(&SlewRateS[3], "12",   "12x",   ISS_OFF);
+        IUFillSwitch(&SlewRateS[4], "64",   "64x",   ISS_ON);
+        IUFillSwitch(&SlewRateS[5], "200",  "200x",  ISS_OFF);
+        IUFillSwitch(&SlewRateS[6], standard_rates[i][0].c_str(), standard_rates[i][0].append("x").c_str(), ISS_OFF);
+        IUFillSwitch(&SlewRateS[7], standard_rates[i][1].c_str(), standard_rates[i][1].append("x").c_str(), ISS_OFF);
+
+        // Slew speed when performing regular GOTO
+        IUFillSwitch(&APSlewSpeedS[0], standard_rates[i][2].c_str(), standard_rates[i][2].append("x").c_str(), ISS_ON);
+        IUFillSwitch(&APSlewSpeedS[1], standard_rates[i][3].c_str(), standard_rates[i][3].append("x").c_str(), ISS_OFF);
+        IUFillSwitch(&APSlewSpeedS[2], standard_rates[i][4].c_str(), standard_rates[i][4].append("x").c_str(), ISS_OFF);
+    }
+}
+
 void LX200AstroPhysicsV2::ISGetProperties(const char *dev)
 {
     LX200Generic::ISGetProperties(dev);
@@ -224,6 +273,8 @@ void LX200AstroPhysicsV2::ISGetProperties(const char *dev)
 
     if (isConnected())
     {
+        if (homeAndReSyncEnabled)
+            defineProperty(&HomeAndReSyncSP);
         defineProperty(&VersionTP);
         defineProperty(&APSlewSpeedSP);
         defineProperty(&SwapSP);
@@ -232,6 +283,10 @@ void LX200AstroPhysicsV2::ISGetProperties(const char *dev)
         defineProperty(&APPECStateTP);
         defineProperty(&APPECRecordSP);
         defineProperty(&APMountStatusTP);
+    }
+    else
+    {
+        LOG_INFO("ISGetProperties: Not Connected");
     }
 }
 
@@ -245,7 +300,8 @@ bool LX200AstroPhysicsV2::updateProperties()
 
     if (isConnected())
     {
-        defineProperty(&VersionTP);
+        if (homeAndReSyncEnabled)
+            defineProperty(&HomeAndReSyncSP);
         /* Motion group */
         defineProperty(&APSlewSpeedSP);
         defineProperty(&SwapSP);
@@ -260,6 +316,7 @@ bool LX200AstroPhysicsV2::updateProperties()
     }
     else
     {
+        deleteProperty(HomeAndReSyncSP.name);
         deleteProperty(VersionTP.name);
         deleteProperty(APSlewSpeedSP.name);
         deleteProperty(SwapSP.name);
@@ -392,11 +449,39 @@ bool LX200AstroPhysicsV2::getPECState(const char *statusString)
     return true;
 }
 
+// The version string should be formatted as VCP4-$MAJOR-$MINOR.
+// Could be VCP5 as well. For instance: VCP4-P02-12
+void LX200AstroPhysicsV2::setMajorMinorVersions(char *version)
+{
+    majorVersion = 0;
+    minorVersion = 0;
+
+    const std::string v = version;
+    std::regex rgx(".*-(\\w+)-(\\w+)");
+    std::smatch match;
+
+    if (std::regex_search(v.begin(), v.end(), match, rgx))
+    {
+        std::string major = match.str(1);
+        std::string minor = match.str(2);
+
+        std::string majorStripped = std::regex_replace(major, std::regex(R"([\D])"), "");
+        std::string minorStripped = std::regex_replace(minor, std::regex(R"([\D])"), "");
+
+        if (majorStripped.size() > 0)
+            majorVersion = stoi(majorStripped);
+        if (minorStripped.size() > 0)
+            minorVersion = stoi(minorStripped);
+    }
+}
+
 bool LX200AstroPhysicsV2::getFirmwareVersion()
 {
     bool success;
     char rev[8];
     char versionString[128];
+    majorVersion = 0;
+    minorVersion = 0;
 
     success = false;
 
@@ -415,6 +500,7 @@ bool LX200AstroPhysicsV2::getFirmwareVersion()
         servoType = GTOCP4;
         strcpy(rev, "V");
         success = true;
+        setMajorMinorVersions(versionString);
     }
     else if (strstr(versionString, "VCP5"))
 
@@ -422,6 +508,7 @@ bool LX200AstroPhysicsV2::getFirmwareVersion()
         firmwareVersion = MCV_V;
         servoType = GTOCP5;
         strcpy(rev, "V");
+        setMajorMinorVersions(versionString);
         success = true;
     }
     else if (strlen(versionString) == 1 || strlen(versionString) == 2)
@@ -451,7 +538,9 @@ bool LX200AstroPhysicsV2::getFirmwareVersion()
     if (success)
     {
         LOGF_INFO("Servo Box Controller: GTOCP%d.", servoType);
-        LOGF_INFO("Firmware Version: '%s' - %s", rev, versionString + 5);
+        LOGF_INFO("Firmware Version: '%s'", versionString);
+        if (majorVersion && minorVersion)
+            LOGF_INFO("Firmware Major Version: %d Minor Version %d", majorVersion, minorVersion);
     }
 
     return success;
@@ -529,6 +618,20 @@ bool LX200AstroPhysicsV2::ApInitialize()
         return false;
     }
 
+    rateTable = AP_RATE_TABLE_DEFAULT;
+    char status_string[256];
+    if (getApStatusString(PortFD, status_string) == TTY_OK)
+    {
+        rateTable = apRateTable(status_string);
+        if ((rateTable >= 0) && (rateTable <= 3))
+            LOGF_INFO("Using Rate Table: %d", rateTable);
+        else
+            rateTable = AP_RATE_TABLE_DEFAULT;
+    }
+    initRateLabels();
+
+    homeAndReSyncEnabled = apCanHome(PortFD);
+
     // Set location up every time we connect.
     double longitude = -1000, latitude = -1000;
     // Get value from config file if it exists.
@@ -580,7 +683,6 @@ bool LX200AstroPhysicsV2::ApInitialize()
     if ( (err = selectAPTrackingMode(PortFD, switch_nr)) < 0)
     {
         LOGF_ERROR("ApInitialize: Error setting tracking mode (%d).", err);
-        fprintf(stderr, "ApInitialize: Error setting tracking mode (%d).\n", err);
         return false;
     }
 
@@ -590,10 +692,9 @@ bool LX200AstroPhysicsV2::ApInitialize()
     //
     // SlewRateS is used as the MoveTo speed
     switch_nr = IUFindOnSwitchIndex(&SlewRateSP);
-    if ( (err = selectAPMoveToRate(PortFD, switch_nr)) < 0)
+    if ((err = selectAPV2CenterRate(PortFD, switch_nr, rateTable)) < 0)
     {
         LOGF_ERROR("ApInitialize: Error setting move rate (%d).", err);
-        fprintf(stderr, "ApInitialize: Error setting move rate (%d).\n", err);
         return false;
     }
 
@@ -849,6 +950,17 @@ bool LX200AstroPhysicsV2::ISNewSwitch(const char *dev, const char *name, ISState
         return true;
     }
 
+    // ===========================================================
+    // Home and ReSync mount
+    // ===========================================================
+    if (strcmp(name, HomeAndReSyncSP.name) == 0)
+    {
+        IUResetSwitch(&HomeAndReSyncSP);
+        apHomeAndSync(PortFD);
+        IDSetSwitch(&HomeAndReSyncSP, nullptr);
+        return true;
+    }
+
     return LX200Generic::ISNewSwitch(dev, name, states, names, n);
 }
 
@@ -964,7 +1076,6 @@ bool LX200AstroPhysicsV2::ReadScopeStatus()
         {
             TrackState = SCOPE_TRACKING;
             LOG_INFO("Slew is complete. Tracking...");
-            fprintf(stderr, "Slew is complete. Tracking...");
         }
 
         // Keep try of last values to determine if the mount settled.
@@ -1028,7 +1139,6 @@ bool LX200AstroPhysicsV2::parkInternal()
     if (APParkMount(PortFD) < 0)
     {
         LOG_ERROR("Parking Failed.");
-        fprintf(stderr, "Parking Failed.\n");
         return false;
     }
 
@@ -1131,24 +1241,6 @@ bool LX200AstroPhysicsV2::Goto(double r, double d)
     LOGF_INFO("Slewing to RA: %s - DEC: %s", RAStr, DecStr);
     return true;
 }
-
-
-bool LX200AstroPhysicsV2::updateAPSlewRate(int index)
-{
-    if (!isSimulation() && selectAPCenterRate(PortFD, index) < 0)
-    {
-        SlewRateSP.s = IPS_ALERT;
-        IDSetSwitch(&SlewRateSP, "Error setting slew mode.");
-        return false;
-    }
-
-    IUResetSwitch(&SlewRateSP);
-    SlewRateS[index].s = ISS_ON;
-    SlewRateSP.s = IPS_OK;
-    IDSetSwitch(&SlewRateSP, nullptr);
-    return true;
-}
-
 
 // AP mounts handle guide commands differently enough from the "generic" LX200 we need to override some
 // functions related to the GuiderInterface
@@ -1358,7 +1450,11 @@ bool LX200AstroPhysicsV2::Handshake()
         LOGF_ERROR("Error clearing the buffer (%d): %s", err, strerror(err));
         return false;
     }
-
+    if (!getActiveConnection()->name().compare("CONNECTION_TCP"))
+    {
+        LOG_INFO("Setting generic udp format (1)");
+        tty_set_generic_udp_format(1);
+    }
     if (setAPBackLashCompensation(PortFD, 0, 0, 0) < 0)
     {
         // It seems we need to send it twice before it works!
@@ -1603,7 +1699,6 @@ bool LX200AstroPhysicsV2::updateAPLocation(double latitude, double longitude, do
     if ((latitude == 0.) && (longitude == 0.))
     {
         LOG_DEBUG("updateLocation: latitude, longitude both zero");
-        fprintf(stderr, "UpdateLocation failed %d ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", __LINE__);
         return false;
     }
 
@@ -1619,14 +1714,12 @@ bool LX200AstroPhysicsV2::updateAPLocation(double latitude, double longitude, do
     if (!isSimulation() && setAPSiteLongitude(PortFD, apLongitude) < 0)
     {
         LOG_ERROR("Error setting site longitude coordinates");
-        fprintf(stderr, "UpdateLocation failed %d ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", __LINE__);
         return false;
     }
 
     if (!isSimulation() && setAPSiteLatitude(PortFD, latitude) < 0)
     {
         LOG_ERROR("Error setting site latitude coordinates");
-        fprintf(stderr, "UpdateLocation failed %d ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", __LINE__);
         return false;
     }
 
@@ -1665,7 +1758,7 @@ void LX200AstroPhysicsV2::debugTriggered(bool enable)
 // ApSetSlew
 bool LX200AstroPhysicsV2::SetSlewRate(int index)
 {
-    if (!isSimulation() && selectAPCenterRate(PortFD, index) < 0)
+    if (!isSimulation() && selectAPV2CenterRate(PortFD, index, rateTable) < 0)
     {
         LOG_ERROR("Error setting slew mode.");
         return false;
@@ -1928,7 +2021,8 @@ bool LX200AstroPhysicsV2::UnPark()
     IDSetSwitch(&UnparkFromSP, nullptr);
     // SlewRateS is used as the MoveTo speed
     int err;
-    if (!isSimulation() && (err = selectAPCenterRate(PortFD, IUFindOnSwitchIndex(&SlewRateSP))) < 0)
+    int switch_nr = IUFindOnSwitchIndex(&SlewRateSP);
+    if (!isSimulation() && (err = selectAPV2CenterRate(PortFD, switch_nr, rateTable)) < 0)
     {
         LOGF_ERROR("Error setting center (MoveTo) rate (%d).", err);
         return false;
@@ -1938,7 +2032,8 @@ bool LX200AstroPhysicsV2::UnPark()
     IDSetSwitch(&SlewRateSP, nullptr);
 
     // APSlewSpeedsS defines the Slew (GOTO) speeds valid on the AP mounts
-    if (!isSimulation() && (err = selectAPSlewRate(PortFD, IUFindOnSwitchIndex(&APSlewSpeedSP))) < 0)
+    switch_nr = IUFindOnSwitchIndex(&APSlewSpeedSP);
+    if (!isSimulation() && (err = selectAPSlewRate(PortFD, switch_nr)) < 0)
     {
         LOGF_ERROR("Error setting slew to rate (%d).", err);
         return false;

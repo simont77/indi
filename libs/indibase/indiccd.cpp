@@ -139,7 +139,7 @@ void CCD::SetCCDCapability(uint32_t cap)
 
 bool CCD::initProperties()
 {
-    DefaultDevice::initProperties(); //  let the base class flesh in what it wants
+    DefaultDevice::initProperties();
 
     // CCD Temperature
     IUFillNumber(&TemperatureN[0], "CCD_TEMPERATURE_VALUE", "Temperature (C)", "%5.2f", -50.0, 50.0, 0., 0.);
@@ -429,11 +429,23 @@ bool CCD::initProperties()
 
     // Snooped Devices
 
-    IUFillText(&ActiveDeviceT[ACTIVE_TELESCOPE], "ACTIVE_TELESCOPE", "Telescope", "Telescope Simulator");
-    IUFillText(&ActiveDeviceT[ACTIVE_ROTATOR], "ACTIVE_ROTATOR", "Rotator", "Rotator Simulator");
-    IUFillText(&ActiveDeviceT[ACTIVE_FOCUSER], "ACTIVE_FOCUSER", "Focuser", "Focuser Simulator");
-    IUFillText(&ActiveDeviceT[ACTIVE_FILTER], "ACTIVE_FILTER", "Filter", "CCD Simulator");
-    IUFillText(&ActiveDeviceT[ACTIVE_SKYQUALITY], "ACTIVE_SKYQUALITY", "Sky Quality", "SQM");
+    // Load from config
+    char telescope[MAXINDIDEVICE] = {"Telescope Simulator"};
+    IUGetConfigText(getDeviceName(), "ACTIVE_DEVICES", "ACTIVE_TELESCOPE", telescope, MAXINDIDEVICE);
+    char rotator[MAXINDIDEVICE] = {"Rotator Simulator"};
+    IUGetConfigText(getDeviceName(), "ACTIVE_DEVICES", "ACTIVE_ROTATOR", rotator, MAXINDIDEVICE);
+    char focuser[MAXINDIDEVICE] = {"Focuser Simulator"};
+    IUGetConfigText(getDeviceName(), "ACTIVE_DEVICES", "ACTIVE_FOCUSER", focuser, MAXINDIDEVICE);
+    char filter[MAXINDIDEVICE] = {"CCD Simulator"};
+    IUGetConfigText(getDeviceName(), "ACTIVE_DEVICES", "ACTIVE_FILTER", filter, MAXINDIDEVICE);
+    char skyquality[MAXINDIDEVICE] = {"SQM"};
+    IUGetConfigText(getDeviceName(), "ACTIVE_DEVICES", "ACTIVE_SKYQUALITY", skyquality, MAXINDIDEVICE);
+
+    IUFillText(&ActiveDeviceT[ACTIVE_TELESCOPE], "ACTIVE_TELESCOPE", "Telescope", telescope);
+    IUFillText(&ActiveDeviceT[ACTIVE_ROTATOR], "ACTIVE_ROTATOR", "Rotator", rotator);
+    IUFillText(&ActiveDeviceT[ACTIVE_FOCUSER], "ACTIVE_FOCUSER", "Focuser", focuser);
+    IUFillText(&ActiveDeviceT[ACTIVE_FILTER], "ACTIVE_FILTER", "Filter", filter);
+    IUFillText(&ActiveDeviceT[ACTIVE_SKYQUALITY], "ACTIVE_SKYQUALITY", "Sky Quality", skyquality);
     IUFillTextVector(&ActiveDeviceTP, ActiveDeviceT, 5, getDeviceName(), "ACTIVE_DEVICES", "Snoop devices", OPTIONS_TAB,
                      IP_RW, 60, IPS_IDLE);
 
@@ -489,9 +501,7 @@ bool CCD::initProperties()
 void CCD::ISGetProperties(const char * dev)
 {
     DefaultDevice::ISGetProperties(dev);
-
     defineProperty(&ActiveDeviceTP);
-    loadConfig(true, "ACTIVE_DEVICES");
 
     if (HasStreaming())
         Streamer->ISGetProperties(dev);
@@ -1825,12 +1835,14 @@ bool CCD::UpdateGuiderFrameType(CCDChip::CCD_FRAME fType)
     return true;
 }
 
-void CCD::addFITSKeywords(fitsfile * fptr, CCDChip * targetChip)
+void CCD::addFITSKeywords(CCDChip * targetChip)
 {
     int status = 0;
     char dev_name[MAXINDINAME] = {0};
     double effectiveFocalLength = std::numeric_limits<double>::quiet_NaN();
     double effectiveAperture = std::numeric_limits<double>::quiet_NaN();
+
+    auto fptr = *targetChip->fitsFilePointer();
 
     AutoCNumeric locale;
     fits_update_key_str(fptr, "ROWORDER", "TOP-DOWN", "Row Order", &status);
@@ -2171,8 +2183,6 @@ bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
     {
         if (EncodeFormatSP[FORMAT_FITS].getState() == ISS_ON)
         {
-            void * memptr;
-            size_t memsize;
             int img_type  = 0;
             int byte_type = 0;
             int status    = 0;
@@ -2181,8 +2191,6 @@ bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
             int nelements = 0;
             std::string bit_depth;
             char error_status[MAXRBUF];
-
-            fitsfile * fptr = nullptr;
 
             naxes[0] = targetChip->getSubW() / targetChip->getBinX();
             naxes[1] = targetChip->getSubH() / targetChip->getBinY();
@@ -2224,26 +2232,18 @@ bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
 
             std::unique_lock<std::mutex> guard(ccdBufferLock);
 
-            //  Now we have to send fits format data to the client
-            memsize = 5760;
-            memptr  = malloc(memsize);
-            if (!memptr)
-            {
-                LOGF_ERROR("Error: failed to allocate memory: %lu", memsize);
-                return false;
-            }
-
-            fits_create_memfile(&fptr, &memptr, &memsize, 2880, realloc, &status);
-
-            if (status)
+            // 8640 = 2880 * 3 which is sufficient for most cases.
+            uint32_t size = 8640 + nelements * (targetChip->getBPP() / 8);
+            //  Initialize FITS file.
+            if (targetChip->openFITSFile(size, status) == false)
             {
                 fits_report_error(stderr, status); /* print out any error messages */
                 fits_get_errstatus(status, error_status);
-                fits_close_file(fptr, &status);
-                free(memptr);
                 LOGF_ERROR("FITS Error: %s", error_status);
                 return false;
             }
+
+            auto fptr = *targetChip->fitsFilePointer();
 
             fits_create_img(fptr, img_type, naxis, naxes, &status);
 
@@ -2251,31 +2251,30 @@ bool CCD::ExposureCompletePrivate(CCDChip * targetChip)
             {
                 fits_report_error(stderr, status); /* print out any error messages */
                 fits_get_errstatus(status, error_status);
-                fits_close_file(fptr, &status);
-                free(memptr);
                 LOGF_ERROR("FITS Error: %s", error_status);
+                targetChip->closeFITSFile();
                 return false;
             }
 
-            addFITSKeywords(fptr, targetChip);
+            addFITSKeywords(targetChip);
 
             fits_write_img(fptr, byte_type, 1, nelements, targetChip->getFrameBuffer(), &status);
+            fits_flush_file(fptr, &status);
 
             if (status)
             {
                 fits_report_error(stderr, status); /* print out any error messages */
                 fits_get_errstatus(status, error_status);
-                fits_close_file(fptr, &status);
-                free(memptr);
                 LOGF_ERROR("FITS Error: %s", error_status);
+                targetChip->closeFITSFile();
                 return false;
             }
 
-            fits_close_file(fptr, &status);
 
-            bool rc = uploadFile(targetChip, memptr, memsize, sendImage, saveImage);
+            bool rc = uploadFile(targetChip, *(targetChip->fitsMemoryBlockPointer()), *(targetChip->fitsMemorySizePointer()), sendImage,
+                                 saveImage);
 
-            free(memptr);
+            targetChip->closeFITSFile();
 
             guard.unlock();
 

@@ -31,6 +31,8 @@
 ***********************************************************************/
 
 #include "lx200generic.h"
+#include "lx200apdriver.h"
+
 #define MOUNTNOTINITIALIZED 0
 #define MOUNTINITIALIZED    1
 
@@ -46,7 +48,6 @@ class LX200AstroPhysicsV2 : public LX200Generic
         typedef enum { GTOCP1 = 1, GTOCP2, GTOCP3, GTOCP4, GTOCP5, GTOCP_UNKNOWN} ServoVersion;
         // This is shared by ParkFrom and ParkTo, and should be coordinated with those.
         typedef enum { PARK_LAST = 0, PARK_CUSTOM = 0, PARK_PARK1 = 1, PARK_PARK2 = 2, PARK_PARK3 = 3, PARK_PARK4 = 4, PARK_CURRENT = 5} ParkPosition;
-        enum APTelescopeSlewRate {AP_SLEW_GUIDE, AP_SLEW_12X, AP_SLEW_64X, AP_SLEW_600X, AP_SLEW_1200X};
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
         virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
         virtual void ISGetProperties(const char *dev) override;
@@ -73,7 +74,6 @@ class LX200AstroPhysicsV2 : public LX200Generic
         virtual bool updateTime(ln_date *utc, double utc_offset) override;
         virtual bool updateLocation(double latitude, double longitude, double elevation) override;
         virtual bool SetSlewRate(int index) override;
-        bool updateAPSlewRate(int index);
 
         // Guide Commands
         virtual IPState GuideNorth(uint32_t ms) override;
@@ -147,6 +147,11 @@ class LX200AstroPhysicsV2 : public LX200Generic
         ISwitchVectorProperty ManualSetParkedSP;
         ISwitch ManualSetParkedS[1];
 
+        ISwitchVectorProperty HomeAndReSyncSP;
+        ISwitch HomeAndReSyncS[1];
+        bool homeAndReSyncEnabled { false };
+        APRateTableState rateTable { AP_RATE_TABLE_DEFAULT };
+
         INumber APWormPositionN[1];
         INumberVectorProperty APWormPositionNP;
 
@@ -161,9 +166,11 @@ class LX200AstroPhysicsV2 : public LX200Generic
 
     private:
         bool ApInitialize();
+        void initRateLabels();
         bool updateAPLocation(double latitude, double longitude, double elevation);
         bool parkInternal();
         bool isAPReady();
+        void setMajorMinorVersions(char *version);
 
         // Side of pier
         void syncSideOfPier();
@@ -179,6 +186,9 @@ class LX200AstroPhysicsV2 : public LX200Generic
 
         ControllerVersion firmwareVersion = MCV_UNKNOWN;
         ServoVersion servoType = GTOCP_UNKNOWN;
+        int majorVersion;
+        int minorVersion;
+
 
         double currentAlt = 0, currentAz = 0;
         double lastRA = 0, lastDE = 0;
