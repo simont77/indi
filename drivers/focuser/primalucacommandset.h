@@ -48,8 +48,9 @@ typedef struct MotorCurrents
 typedef enum
 {
     MOT_1,
-    MOT_2
-} MotorType;
+    MOT_2,
+    GENERIC_NODE
+} NodeType;
 
 typedef enum
 {
@@ -73,35 +74,37 @@ class Communication
         }
 
         // Communication functions
-        bool sendCommand(const std::string &command, json *response = nullptr);
-        template <typename T = int32_t> bool genericCommand(const std::string &motor, const std::string &type, const json &command, T *response = nullptr);
+        bool sendRequest(const json &command, json *response = nullptr);
+        template <typename T = int32_t> bool genericRequest(const std::string &node, const std::string &type, const json &command, T *response = nullptr);
         /**
          * @brief Get paramter from device.
+         * @param type motor type, if MOT_NONE, then it's a generic device-wide get.
          * @param paramter paramter name (e.g.SN)
          * @param value where to store the queried value.
          * @return True if successful, false otherwise.
-         * @note This is a generic get and not related to any motor.
          * @example {"req":{"get":{"SN":""}}} --> {"res":{"get":{"SN":" ESATTO30001"}}
-         */
-        template <typename T> bool get(const std::string &parameter, T &value);
-
-        /**
-         * @brief Get paramter from motor.
-         * @param paramter paramter name (e.g.SN)
-         * @param value where to store the queried value.
-         * @return True if successful, false otherwise.
          * @example {"req":{"get": {"MOT1" :{"BKLASH": ""}}} --> {"res":{"get": {"MOT1" :{"BKLASH": 120}}}
          */
-        template <typename T = int32_t> bool motorGet(MotorType type, const std::string &parameter, T &value);
+        template <typename T = int32_t> bool get(NodeType type, const std::string &parameter, T &value);
 
         /**
-         * @brief Set paramter on device.
-         * @param paramter paramter name (e.g.BKLASH)
-         * @param command Command containing the data to be sent
+         * @brief getStringAsDouble Same as get, but it receives a string and scan it for double.
+         * @param type motor type
+         * @param parameter parameter name
+         * @param value value to store the scanned double value.
          * @return True if successful, false otherwise.
+         */
+        bool getStringAsDouble(NodeType type, const std::string &parameter, double &value);
+
+        /**
+         * @brief Set JSON value
+         * @param value json value to set
+         * @return True if successful, false otherwise.
+         * @note This is a generic set and not related to any motor.
+         * @example {"req":{"set": {"ARCO": 1}}} --> {"res":{"set": {"ARCO": "done"}}}
          * @example {"req":{"set": {"MOT1" :{"BKLASH": 120}}} --> {"res":{"set": {"MOT1" :{"BKLASH": "done"}}}
          */
-        template <typename T = int32_t> bool motorSet(MotorType type, const json &command);
+        bool set(NodeType type, const json &value);
 
         /**
          * @brief Execute a motor command.
@@ -109,14 +112,14 @@ class Communication
          * @return True if successful, false otherwise.
          * @example {"req":{"cmd":{"MOT1" :{"MOT_STOP":""}}}} --> {"res":{"cmd":{"MOT1" :{"MOT_STOP":"done"}}}}
          */
-        template <typename T = int32_t> bool motorCommand(MotorType type, const json &command);
+        template <typename T = int32_t> bool command(NodeType type, const json &jsonCommand);
 
     private:
         std::string m_DeviceName;
         int m_PortFD {-1};
 
         // Maximum buffer for sending/receving.
-        static constexpr const int DRIVER_LEN {1024};
+        static constexpr const int DRIVER_LEN {4096};
         static const char DRIVER_STOP_CHAR { 0xD };
         static const char DRIVER_TIMEOUT { 5 };
 };
@@ -135,20 +138,26 @@ class Focuser
         bool getAbsolutePosition(uint32_t &position);
 
         // Motion
+        bool getStatus(json &status);
         bool goAbsolutePosition(uint32_t position);
         bool stop();
         bool fastMoveOut();
         bool fastMoveIn();
         bool getCurrentSpeed(uint32_t &speed);
+        bool isBusy();
 
         // Firmware
         bool getSerialNumber(std::string &response);
         bool getFirmwareVersion(std::string &response);
 
+        // Backlash
+        bool setBacklash(uint32_t steps);
+        bool getBacklash(uint32_t &steps);
+
         // Sensors
         bool getMotorTemp(double &value);
         bool getExternalTemp(double &value);
-        bool getVoltageIn(double &value);
+        bool getVoltage12v(double &value);
 
     protected:
         std::unique_ptr<Communication> m_Communication;
@@ -192,6 +201,9 @@ class Esatto : public Focuser
         // Backlash
         bool setBacklash(uint32_t steps);
         bool getBacklash(uint32_t &steps);
+
+        // Sensors
+        bool getVoltageUSB(double &value);
 };
 
 /*****************************************************************************************
@@ -204,10 +216,15 @@ class Arco
     public:
         explicit Arco(const std::string &name, int port);
 
+        // Motor Info
+        bool getMotorInfo(json &info);
         // Is it detected and enabled?
+        bool setEnabled(bool enabled);
         bool isEnabled();
 
         // Motion
+        bool isBusy();
+        bool getStatus(json &status);
         bool moveAbsolutePoition(Units unit, double value);
         bool stop();
 
@@ -218,14 +235,41 @@ class Arco
         // Calibration
         bool calibrate();
         bool isCalibrating();
-        bool isBusy();
 
         // Reverse
         bool reverse(bool enabled);
         bool isReversed();
 
+        // Firmware
+        bool getSerialNumber(std::string &response);
+        bool getFirmwareVersion(std::string &response);
+
     private:
         std::unique_ptr<Communication> m_Communication;
 };
+
+/*****************************************************************************************
+ * GIOTTO class
+ * Set/Get brightness levels
+******************************************************************************************/
+class GIOTTO
+{
+
+    public:
+        explicit GIOTTO(const std::string &name, int port);
+
+        // Light
+        bool setLightEnabled(bool enabled);
+        bool isLightEnabled();
+
+        // Brightness
+        bool getMaxBrightness(uint16_t &value);
+        bool setBrightness(uint16_t value);
+        bool getBrightness(uint16_t &value);
+
+private:
+    std::unique_ptr<Communication> m_Communication;
+};
+
 
 }

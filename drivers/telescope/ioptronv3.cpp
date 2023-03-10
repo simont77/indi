@@ -551,6 +551,7 @@ bool IOptronV3::ISNewNumber(const char *dev, const char *name, double values[], 
                           MeridianLimitN[0].value, MeridianActionS[IOP_MB_STOP].s == ISS_ON ? "stop" : "flip");
             }
             IDSetNumber(&MeridianLimitNP, nullptr);
+            saveConfig(true, MeridianLimitNP.name);
             return true;
         }
 
@@ -661,9 +662,26 @@ bool IOptronV3::ISNewSwitch(const char *dev, const char *name, ISState *states, 
         }
 
         /*******************************************************
+         * Meridian Action Operations
+        *******************************************************/
+        if (!strcmp(name, MeridianActionSP.name))
+        {
+            IUUpdateSwitch(&MeridianActionSP, states, names, n);
+            MeridianActionSP.s = (driver->setMeridianBehavior(static_cast<IOP_MB_STATE>(IUFindOnSwitchIndex(&MeridianActionSP)),
+                                  MeridianLimitN[0].value)) ? IPS_OK : IPS_ALERT;
+            if (MeridianActionSP.s == IPS_OK)
+            {
+                LOGF_INFO("Mount Meridian Behavior: When mount reaches %.f degrees past meridian, it will %s.",
+                          MeridianLimitN[0].value, MeridianActionS[IOP_MB_STOP].s == ISS_ON ? "stop" : "flip");
+            }
+            IDSetSwitch(&MeridianActionSP, nullptr);
+            saveConfig(true, MeridianActionSP.name);
+            return true;
+        }
+
+        /*******************************************************
          * PEC Operations
         *******************************************************/
-        
         if (!strcmp(name, PECStateSP.name))
         {
             IUUpdateSwitch(&PECStateSP, states, names, n);

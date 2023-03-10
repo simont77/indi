@@ -491,7 +491,6 @@ bool CelestronGPS::updateProperties()
         //  handle the focuser
         if (fwInfo.hasFocuser)
         {
-            LOG_INFO("update focuser properties");
             //defineProperty(&FocusBacklashNP);
             defineProperty(&FocusMinPosNP);
             if (focusReadLimits())
@@ -502,6 +501,10 @@ bool CelestronGPS::updateProperties()
                 IDSetNumber(&FocusMinPosNP, nullptr);
                 // focuser move capability is only set if the focus limits are valid
                 FI::SetCapability(FOCUSER_CAN_ABS_MOVE | FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT);
+                setDriverInterface(getDriverInterface() | FOCUSER_INTERFACE);
+                syncDriverInfo();
+
+                LOG_INFO("Auxiliary focuser is connected.");
             }
             if (!focuserIsCalibrated)
             {
@@ -515,7 +518,6 @@ bool CelestronGPS::updateProperties()
         INDI::Telescope::updateProperties();
 
         FI::updateProperties();
-        //deleteProperty(FocusBacklashNP.name);
         deleteProperty(FocusMinPosNP.name);
 
         //GUIDE Delete properties.

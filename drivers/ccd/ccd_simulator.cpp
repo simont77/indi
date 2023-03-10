@@ -44,10 +44,6 @@ CCDSim::CCDSim() : INDI::FilterInterface(this)
 
     terminateThread = false;
 
-    //  focal length of the telescope in millimeters
-    primaryFocalLength = 900;
-    guiderFocalLength  = 300;
-
     time(&RunStart);
 
     // Filter stuff
@@ -233,10 +229,6 @@ bool CCDSim::initProperties()
 
     setDriverInterface(getDriverInterface() | FILTER_INTERFACE);
 
-    // Make Guide Scope ON by default
-    TelescopeTypeS[TELESCOPE_PRIMARY].s = ISS_OFF;
-    TelescopeTypeS[TELESCOPE_GUIDE].s = ISS_ON;
-
     return true;
 }
 
@@ -326,12 +318,6 @@ int CCDSim::SetTemperature(double temperature)
 
 bool CCDSim::StartExposure(float duration)
 {
-    if (std::isnan(RA) && std::isnan(Dec))
-    {
-        LOG_ERROR("Telescope coordinates missing. Make sure telescope is connected and its name is set in CCD Options.");
-        return false;
-    }
-
     //  for the simulator, we can just draw the frame now
     //  and it will get returned at the right time
     //  by the timer routines
@@ -341,7 +327,7 @@ bool CCDSim::StartExposure(float duration)
     PrimaryCCD.setExposureDuration(duration);
     gettimeofday(&ExpStart, nullptr);
     //  Leave the proper time showing for the draw routines
-    if (DirectoryS[INDI_ENABLED].s == ISS_ON)
+    if (PrimaryCCD.getFrameType() == INDI::CCDChip::LIGHT_FRAME && DirectoryS[INDI_ENABLED].s == ISS_ON)
     {
         if (loadNextImage() == false)
             return false;
@@ -527,7 +513,6 @@ int CCDSim::DrawCcdFrame(INDI::CCDChip * targetChip)
 {
     //  CCD frame is 16 bit data
     float exposure_time;
-    float targetFocalLength;
 
     uint16_t * ptr = reinterpret_cast<uint16_t *>(targetChip->getFrameBuffer());
 
@@ -538,17 +523,11 @@ int CCDSim::DrawCcdFrame(INDI::CCDChip * targetChip)
     else
         exposure_time = ExposureRequest;
 
-    if (GainN[0].value > 50)
-        exposure_time *= sqrt(GainN[0].value - 50);
-    else if (GainN[0].value < 50)
-        exposure_time /= sqrt(50 - GainN[0].value);
+    exposure_time *= (1 + sqrt(GainN[0].value));
 
-    if (TelescopeTypeS[TELESCOPE_PRIMARY].s == ISS_ON)
-        targetFocalLength = primaryFocalLength;
-    else
-        targetFocalLength = guiderFocalLength;
+    auto targetFocalLength = ScopeInfoNP[FocalLength].getValue() > 0 ? ScopeInfoNP[FocalLength].getValue() : snoopedFocalLength;
 
-    if (ShowStarField && GainN[0].value > 0)
+    if (ShowStarField)
     {
         float PEOffset {0};
         float decDrift {0};
@@ -642,6 +621,12 @@ int CCDSim::DrawCcdFrame(INDI::CCDChip * targetChip)
 #endif
             currentRA  = RA;
             currentDE = Dec;
+
+            if (std::isnan(currentRA))
+            {
+                currentRA = 0;
+                currentDE = 0;
+            }
 
             INDI::IEquatorialCoordinates epochPos { 0, 0 }, J2000Pos { 0, 0 };
 
@@ -815,7 +800,7 @@ int CCDSim::DrawCcdFrame(INDI::CCDChip * targetChip)
         if (ftype == INDI::CCDChip::LIGHT_FRAME || ftype == INDI::CCDChip::FLAT_FRAME)
         {
             //  calculate flux from our zero point and gain values
-            float glow = m_SkyGlow;
+            float glow = m_SkyGlow * 1.3;
 
             if (ftype == INDI::CCDChip::FLAT_FRAME)
             {

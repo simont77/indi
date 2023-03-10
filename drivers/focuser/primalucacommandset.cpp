@@ -26,6 +26,7 @@
 #include <cstring>
 #include <memory>
 #include <algorithm>
+#include <regex>
 
 #include <assert.h>
 #include <termios.h>
@@ -39,16 +40,28 @@
 namespace PrimalucaLabs
 {
 
+std::vector<std::string> split(const std::string &input, const std::string &regex)
+{
+    // passing -1 as the submatch index parameter performs splitting
+    std::regex re(regex);
+    std::sregex_token_iterator
+    first{input.begin(), input.end(), re, -1},
+          last;
+    return {first, last};
+}
+
 /******************************************************************************************************
  * Communication
 *******************************************************************************************************/
-bool Communication::sendCommand(const std::string &command, json *response)
+bool Communication::sendRequest(const json &command, json *response)
 {
     int tty_rc = TTY_OK;
     int nbytes_written = 0, nbytes_read = 0;
     tcflush(m_PortFD, TCIOFLUSH);
-    LOGF_DEBUG("<REQ> %s", command.c_str());
-    if ( (tty_rc = tty_write(m_PortFD, command.c_str(), command.length(), &nbytes_written)) == TTY_OK)
+
+    std::string output = command.dump();
+    LOGF_DEBUG("<REQ> %s", output.c_str());
+    if ( (tty_rc = tty_write(m_PortFD, output.c_str(), output.length(), &nbytes_written)) != TTY_OK)
     {
         char errorMessage[MAXRBUF] = {0};
         tty_error_msg(tty_rc, errorMessage, MAXRBUF);
@@ -61,7 +74,7 @@ bool Communication::sendCommand(const std::string &command, json *response)
         return true;
 
     char read_buf[DRIVER_LEN] = {0};
-    if ( (tty_rc = tty_read_section(m_PortFD, read_buf, DRIVER_STOP_CHAR, DRIVER_TIMEOUT, &nbytes_read)) == TTY_OK)
+    if ( (tty_rc = tty_read_section(m_PortFD, read_buf, DRIVER_STOP_CHAR, DRIVER_TIMEOUT, &nbytes_read)) != TTY_OK)
     {
         char errorMessage[MAXRBUF] = {0};
         tty_error_msg(tty_rc, errorMessage, MAXRBUF);
@@ -73,6 +86,11 @@ bool Communication::sendCommand(const std::string &command, json *response)
 
     try
     {
+        if (strstr(read_buf, "Error:"))
+        {
+            LOGF_ERROR("Required %s failed: %s", command.dump().c_str(), read_buf);
+            return false;
+        }
         *response = json::parse(read_buf)["res"];
     }
     catch (json::exception &e)
@@ -85,64 +103,117 @@ bool Communication::sendCommand(const std::string &command, json *response)
     return true;
 }
 
-template <typename T> bool Communication::motorGet(MotorType type, const std::string &parameter, T &value)
+bool Communication::getStringAsDouble(NodeType type, const std::string &parameter, double &value)
 {
-    auto motor = type == MOT_1 ? "MOT1" : "MOT2";
-    json jsonRequest = {"req", {"get", {motor, ""}}};
-    json jsonResponse;
-    if (sendCommand(jsonRequest, &jsonResponse))
+    std::string response;
+    if (get(type, parameter, response))
     {
-        jsonResponse["get"][motor][parameter].get_to(value);
+        sscanf(response.c_str(), "%lf", &value);
         return true;
     }
     return false;
 }
 
-template <typename T> bool Communication::get(const std::string &parameter, T &value)
+template <typename T> bool Communication::get(NodeType type, const std::string &parameter, T &value)
 {
-    json jsonRequest = {"req", {"get", {parameter, ""}}};
-    json jsonResponse;
-    if (sendCommand(jsonRequest, &jsonResponse))
+    std::string node;
+    switch (type)
     {
-        jsonResponse["get"][parameter].get_to(value);
-        return true;
+        case MOT_1:
+            node = "MOT1";
+            break;
+        case MOT_2:
+            node = "MOT2";
+            break;
+        default:
+            break;
     }
+
+    json jsonRequest = {{parameter, ""}};
+    return genericRequest(node, "get", jsonRequest, &value);
+}
+
+bool Communication::set(NodeType type, const json &value)
+{
+    std::string node;
+    switch (type)
+    {
+        case MOT_1:
+            node = "MOT1";
+            break;
+        case MOT_2:
+            node = "MOT2";
+            break;
+        default:
+            break;
+    }
+
+    std::string isDone;
+    if (genericRequest(node, "set", value, &isDone))
+        return isDone == "done";
     return false;
 }
 
-template <typename T> bool Communication::genericCommand(const std::string &motor, const std::string &type,
+template <typename T> bool Communication::genericRequest(const std::string &node, const std::string &type,
         const json &command, T *response)
 {
-    json jsonRequest = {"req", {type, {motor, command}}};
+    json jsonRequest;
+    if (node.empty())
+        jsonRequest = {{"req", {{type, command}}}};
+    else
+        jsonRequest = {{"req", {{type, {{node, command}}}}}};
     if (response == nullptr)
-        return sendCommand(jsonRequest);
+        return sendRequest(jsonRequest);
     else
     {
         json jsonResponse;
-        if (sendCommand(jsonRequest, &jsonResponse))
+        if (sendRequest(jsonRequest, &jsonResponse))
         {
-            auto key = command.items().begin().key();
-            return jsonResponse[type][motor][key].get_to(*response);
+            // There is no command.items().last() so we have to iterate all
+            std::string key;
+            std::string flat = command.flatten().items().begin().key();
+            std::vector<std::string> keys = split(flat, "/");
+            key = keys.back();
+            //            for (auto &oneItem : command.items())
+            //                key = oneItem.key();
+            try
+            {
+                if (node.empty())
+                    jsonResponse[type][key].get_to(*response);
+                else
+                    jsonResponse[type][node][key].get_to(*response);
+            }
+            catch (json::exception &e)
+            {
+                // output exception information
+                LOGF_ERROR("Failed Request: %s\nResponse: %s\nException: %s id: %d", jsonRequest.dump().c_str(),
+                           jsonResponse.dump().c_str(),
+                           e.what(), e.id);
+                return false;
+            }
+            return true;
         }
     }
 
     return false;
 }
 
-template <typename T> bool Communication::motorSet(MotorType type, const json &command)
+template <typename T> bool Communication::command(NodeType type, const json &jsonCommand)
 {
-    json response;
-    auto motor = type == MOT_1 ? "MOT1" : "MOT2";
-    if (genericCommand(motor, "set", command, &response))
-        return response == "done";
-    return false;
-}
-
-template <typename T> bool Communication::motorCommand(MotorType type, const json &command)
-{
-    json response;
-    auto motor = type == MOT_1 ? "MOT1" : "MOT2";
-    if (genericCommand(motor, "cmd", command, &response))
+    std::string node;
+    switch (type)
+    {
+        case MOT_1:
+            node = "MOT1";
+            break;
+        case MOT_2:
+            node = "MOT2";
+            break;
+        default:
+            break;
+    }
+    std::string response;
+    if (genericRequest(node, "cmd", jsonCommand, &response))
         return response == "done";
     return false;
 }
@@ -160,7 +231,7 @@ Focuser::Focuser(const std::string &name, int port)
 *******************************************************************************************************/
 bool Focuser::goAbsolutePosition(uint32_t position)
 {
-    return m_Communication->motorCommand(MOT_1, {"MOV_ABS", {"STEPS", position}});
+    return m_Communication->command(MOT_1, {{"MOVE_ABS", {{"STEP", position}}}});
 }
 
 /******************************************************************************************************
@@ -168,7 +239,7 @@ bool Focuser::goAbsolutePosition(uint32_t position)
 *******************************************************************************************************/
 bool Focuser::stop()
 {
-    return m_Communication->motorCommand(MOT_1, {"MOT_STOP", ""});
+    return m_Communication->command(MOT_1, {{"MOT_STOP", ""}});
 }
 
 /******************************************************************************************************
@@ -176,7 +247,7 @@ bool Focuser::stop()
 *******************************************************************************************************/
 bool Focuser::fastMoveOut()
 {
-    return m_Communication->motorCommand(MOT_1, {"F_OUTW", ""});
+    return m_Communication->command(MOT_1, {{"F_OUTW", ""}});
 }
 
 /******************************************************************************************************
@@ -184,7 +255,7 @@ bool Focuser::fastMoveOut()
 *******************************************************************************************************/
 bool Focuser::fastMoveIn()
 {
-    return m_Communication->motorCommand(MOT_1, {"F_INW", ""});
+    return m_Communication->command(MOT_1, {{"F_INW", ""}});
 }
 
 /******************************************************************************************************
@@ -192,7 +263,7 @@ bool Focuser::fastMoveIn()
 *******************************************************************************************************/
 bool Focuser::getMaxPosition(uint32_t &position)
 {
-    return m_Communication->motorGet(MOT_1, "CAL_MAXPOS", position);
+    return m_Communication->get(MOT_1, "CAL_MAXPOS", position);
 }
 
 /******************************************************************************************************
@@ -201,7 +272,7 @@ bool Focuser::getMaxPosition(uint32_t &position)
 bool Focuser::isHallSensorDetected(bool &isDetected)
 {
     int detected = 0;
-    if (m_Communication->motorGet(MOT_1, "HSENDET", detected))
+    if (m_Communication->get(MOT_1, "HSENDET", detected))
     {
         isDetected = detected == 1;
         return true;
@@ -214,7 +285,7 @@ bool Focuser::isHallSensorDetected(bool &isDetected)
 *******************************************************************************************************/
 bool Focuser::getAbsolutePosition(uint32_t &position)
 {
-    return m_Communication->motorGet(MOT_1, "ABS_POS", position);
+    return m_Communication->get(MOT_1, "ABS_POS", position);
 }
 
 /******************************************************************************************************
@@ -222,7 +293,28 @@ bool Focuser::getAbsolutePosition(uint32_t &position)
 *******************************************************************************************************/
 bool Focuser::getCurrentSpeed(uint32_t &speed)
 {
-    return m_Communication->motorGet(MOT_1, "SPEED", speed);
+    return m_Communication->get(MOT_1, "SPEED", speed);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Focuser::getStatus(json &status)
+{
+    return m_Communication->get(MOT_1, "STATUS", status);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Focuser::isBusy()
+{
+    json status;
+    if (m_Communication->get(MOT_1, "STATUS", status))
+    {
+        return status["BUSY"] == 1;
+    }
+    return false;
 }
 
 /******************************************************************************************************
@@ -230,7 +322,7 @@ bool Focuser::getCurrentSpeed(uint32_t &speed)
 *******************************************************************************************************/
 bool Focuser::getMotorTemp(double &value)
 {
-    return m_Communication->motorGet(MOT_1, "NTC_T", value);
+    return m_Communication->getStringAsDouble(MOT_1, "NTC_T", value);
 }
 
 /******************************************************************************************************
@@ -238,15 +330,7 @@ bool Focuser::getMotorTemp(double &value)
 *******************************************************************************************************/
 bool Focuser::getExternalTemp(double &value)
 {
-    return m_Communication->get("EXT_T", value);
-}
-
-/******************************************************************************************************
- *
-*******************************************************************************************************/
-bool Focuser::getVoltageIn(double &value)
-{
-    return m_Communication->get("VIN_12V", value);
+    return m_Communication->getStringAsDouble(GENERIC_NODE, "EXT_T", value);
 }
 
 /******************************************************************************************************
@@ -254,7 +338,15 @@ bool Focuser::getVoltageIn(double &value)
 *******************************************************************************************************/
 bool Focuser::getSerialNumber(std::string &response)
 {
-    return m_Communication->get("SN", response);
+    return m_Communication->get(GENERIC_NODE, "SN", response);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Focuser::getVoltage12v(double &value)
+{
+    return m_Communication->getStringAsDouble(GENERIC_NODE, "VIN_12V", value);
 }
 
 /******************************************************************************************************
@@ -263,7 +355,7 @@ bool Focuser::getSerialNumber(std::string &response)
 bool Focuser::getFirmwareVersion(std::string &response)
 {
     json versions;
-    if (m_Communication->get("SWVERS", response))
+    if (m_Communication->get(GENERIC_NODE, "SWVERS", versions))
     {
         versions["SWAPP"].get_to(response);
         return true;
@@ -272,12 +364,29 @@ bool Focuser::getFirmwareVersion(std::string &response)
 }
 
 /******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Focuser::setBacklash(uint32_t steps)
+{
+    return m_Communication->set(MOT_1, {{"BKLASH", steps}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Focuser::getBacklash(uint32_t &steps)
+{
+    return m_Communication->get(MOT_1, "BKLASH", steps);
+}
+
+
+/******************************************************************************************************
  * SestoSenso2 functions
 *******************************************************************************************************/
 SestoSenso2::SestoSenso2(const std::string &name, int port) : Focuser(name, port) {}
 bool SestoSenso2::storeAsMaxPosition()
 {
-    return m_Communication->motorCommand(MOT_1, {"CAL_FOCUSER", "StoreAsMaxPos"});
+    return m_Communication->command(MOT_1, {{"CAL_FOCUSER", "StoreAsMaxPos"}});
 }
 
 /******************************************************************************************************
@@ -285,7 +394,7 @@ bool SestoSenso2::storeAsMaxPosition()
 *******************************************************************************************************/
 bool SestoSenso2::storeAsMinPosition()
 {
-    return m_Communication->motorCommand(MOT_1, {"CAL_FOCUSER", "StoreAsMinPos"});
+    return m_Communication->command(MOT_1, {{"CAL_FOCUSER", "StoreAsMinPos"}});
 }
 
 /******************************************************************************************************
@@ -293,7 +402,7 @@ bool SestoSenso2::storeAsMinPosition()
 *******************************************************************************************************/
 bool SestoSenso2::goOutToFindMaxPos()
 {
-    return m_Communication->motorCommand(MOT_1, {"CAL_FOCUSER", "GoOutToFindMaxPos"});
+    return m_Communication->command(MOT_1, {"CAL_FOCUSER", "GoOutToFindMaxPos"});
 }
 
 /******************************************************************************************************
@@ -301,7 +410,7 @@ bool SestoSenso2::goOutToFindMaxPos()
 *******************************************************************************************************/
 bool SestoSenso2::initCalibration()
 {
-    return m_Communication->motorCommand(MOT_1, {"CAL_FOCUSER", "Init"});
+    return m_Communication->command(MOT_1, {{"CAL_FOCUSER", "Init"}});
 }
 
 /******************************************************************************************************
@@ -309,7 +418,7 @@ bool SestoSenso2::initCalibration()
 *******************************************************************************************************/
 bool SestoSenso2::applyMotorPreset(const std::string &name)
 {
-    return m_Communication->motorCommand(MOT_1, {"RUNPRESET", name});
+    return m_Communication->command(GENERIC_NODE, {{"RUNPRESET", name}});
 }
 
 /******************************************************************************************************
@@ -330,8 +439,7 @@ bool SestoSenso2::setMotorUserPreset(uint32_t index, const MotorRates &rates, co
         {"M1CHOLD", currents.holdCurrent}
     };
 
-    json jsonRequest = {"req", {"set", {name, preset}}};
-    return m_Communication->sendCommand(jsonRequest);
+    return m_Communication->set(MOT_1, {{name, preset}});
 }
 
 /******************************************************************************************************
@@ -339,10 +447,19 @@ bool SestoSenso2::setMotorUserPreset(uint32_t index, const MotorRates &rates, co
 *******************************************************************************************************/
 bool SestoSenso2::getMotorSettings(MotorRates &rates, MotorCurrents &currents, bool &motorHoldActive)
 {
-    json jsonRequest = {"req", {"get", {"MOT1", ""}}};
+    json jsonRequest = {{"req", {{"get", {{"MOT1", { {"FnRUN_ACC", ""},
+                                {"FnRUN_DEC", ""}, {"FnRUN_SPD", ""}, {"FnRUN_CURR_ACC", ""},
+                                {"FnRUN_CURR_DEC", ""}, {"FnRUN_CURR_SPD", ""}, {"FnRUN_CURR_HOLD", ""}, {"HOLDCURR_STATUS", ""}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
     json jsonResponse;
 
-    if (m_Communication->sendCommand(jsonRequest, &jsonResponse))
+    if (m_Communication->sendRequest(jsonRequest, &jsonResponse))
     {
         jsonResponse["get"]["MOT1"]["FnRUN_ACC"].get_to(rates.accRate);
         jsonResponse["get"]["MOT1"]["FnRUN_DEC"].get_to(rates.decRate);
@@ -352,7 +469,10 @@ bool SestoSenso2::getMotorSettings(MotorRates &rates, MotorCurrents &currents, b
         jsonResponse["get"]["MOT1"]["FnRUN_CURR_DEC"].get_to(currents.decCurrent);
         jsonResponse["get"]["MOT1"]["FnRUN_CURR_SPD"].get_to(currents.runCurrent);
         jsonResponse["get"]["MOT1"]["FnRUN_CURR_HOLD"].get_to(currents.holdCurrent);
-        jsonResponse["get"]["MOT1"]["HOLDCURR_STATUS"].get_to(motorHoldActive);
+
+        int status = 0;
+        jsonResponse["get"]["MOT1"]["HOLDCURR_STATUS"].get_to(status);
+        motorHoldActive = ( status == 1 );
         return true;
     }
     return false;
@@ -370,8 +490,7 @@ bool SestoSenso2::setMotorRates(const MotorRates &rates)
         {"FnRUN_ACC", rates.accRate},
     };
 
-    json jsonRequest = {"req", {"set", {"MOT1", jsonRates}}};
-    return m_Communication->sendCommand(jsonRequest);
+    return m_Communication->set(MOT_1, jsonRates);
 }
 
 /******************************************************************************************************
@@ -387,8 +506,7 @@ bool SestoSenso2::setMotorCurrents(const MotorCurrents &currents)
         {"FnRUN_CURR_HOLD", currents.holdCurrent},
     };
 
-    json jsonRequest = {"req", {"set", {"MOT1", jsonRates}}};
-    return m_Communication->sendCommand(jsonRequest);
+    return m_Communication->set(MOT_1, jsonRates);
 }
 
 /******************************************************************************************************
@@ -396,9 +514,7 @@ bool SestoSenso2::setMotorCurrents(const MotorCurrents &currents)
 *******************************************************************************************************/
 bool SestoSenso2::setMotorHold(bool hold)
 {
-    json jsonHold = {"HOLDCURR_STATUS", hold ? 1 : 0};
-    json jsonRequest = {"req", {"set", {"MOT1", jsonHold}}};
-    return m_Communication->sendCommand(jsonRequest);
+    return m_Communication->set(MOT_1, {{"HOLDCURR_STATUS", hold ? 1 : 0}});
 }
 
 /******************************************************************************************************
@@ -407,7 +523,7 @@ bool SestoSenso2::setMotorHold(bool hold)
 Esatto::Esatto(const std::string &name, int port) : Focuser(name, port) {}
 bool Esatto::setBacklash(uint32_t steps)
 {
-    return m_Communication->motorSet(MOT_1, {"BKLASH", steps});
+    return m_Communication->set(MOT_1, {{"BKLASH", steps}});
 }
 
 /******************************************************************************************************
@@ -415,7 +531,15 @@ bool Esatto::setBacklash(uint32_t steps)
 *******************************************************************************************************/
 bool Esatto::getBacklash(uint32_t &steps)
 {
-    return m_Communication->motorGet(MOT_1, "BKLASH", steps);
+    return m_Communication->get(MOT_1, "BKLASH", steps);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Esatto::getVoltageUSB(double &value)
+{
+    return m_Communication->getStringAsDouble(GENERIC_NODE, "VIN_USB", value);
 }
 
 /******************************************************************************************************
@@ -429,10 +553,18 @@ Arco::Arco(const std::string &name, int port)
 /******************************************************************************************************
  *
 *******************************************************************************************************/
+bool Arco::setEnabled(bool enabled)
+{
+    return m_Communication->set(GENERIC_NODE, {{"ARCO", enabled ? 1 : 0}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
 bool Arco::isEnabled()
 {
     int enabled = 0;
-    if (m_Communication->motorGet(MOT_2, "ARCO", enabled))
+    if (m_Communication->get(GENERIC_NODE, "ARCO", enabled))
         return enabled == 1;
     return false;
 }
@@ -446,24 +578,30 @@ bool Arco::getAbsolutePosition(Units unit, double &value)
     switch (unit)
     {
         case UNIT_DEGREES:
-            command["POSITION"] = "DEG";
+            command = {{"POSITION", "DEG"}};
             break;
         case UNIT_ARCSECS:
-            command["POSITION"] = "ARCSEC";
+            command = {{"POSITION", "ARCSEC"}};
             break;
         case UNIT_STEPS:
-            command["POSITION"] = "STEPS";
+            command = {{"POSITION", "STEP"}};
             break;
     }
 
-    json jsonRequest = {"req", {"get", {"MOT2", command}}};
-    json jsonResponse;
-    if (m_Communication->sendCommand(jsonRequest, &jsonResponse))
-    {
 
-        std::string position = jsonResponse["get"]["MOT2"]["POSITION"];
-        sscanf(position.c_str(), "%lf", &value);
-        return true;
+    // For steps, we can value directly
+    if (unit == UNIT_STEPS)
+        return m_Communication->genericRequest("MOT2", "get", command, &value);
+    // For DEG and ARCSEC, a string is returned that we must parse.
+    // e.g. "10.000[DEG]"
+    else
+    {
+        std::string response;
+        if (m_Communication->genericRequest("MOT2", "get", command, &response))
+        {
+            sscanf(response.c_str(), "%lf", &value);
+            return true;
+        }
     }
 
     return false;
@@ -478,18 +616,17 @@ bool Arco::moveAbsolutePoition(Units unit, double value)
     switch (unit)
     {
         case UNIT_DEGREES:
-            command["MOVE"] = {"DEG", value};
+            command = {{"MOVE_ABS", {{"DEG", value}}}};
             break;
         case UNIT_ARCSECS:
-            command["MOVE"] = {"ARCSEC", value};
+            command = {{"MOVE_ABS", {{"ARCSEC", value}}}};
             break;
         case UNIT_STEPS:
-            command["MOVE"] = {"STEPS", value};
+            command = {{"MOVE_ABS", {{"STEP", static_cast<int>(value)}}}};
             break;
     }
 
-    json jsonRequest = {"req", {"cmd", {"MOT2", command}}};
-    return m_Communication->sendCommand(jsonRequest);
+    return m_Communication->command(MOT_2, command);
 }
 
 /******************************************************************************************************
@@ -501,18 +638,17 @@ bool Arco::sync(Units unit, double value)
     switch (unit)
     {
         case UNIT_DEGREES:
-            command["SYNC_POS"] = {"DEG", value};
+            command = {{"SYNC_POS", {{"DEG", value}}}};
             break;
         case UNIT_ARCSECS:
-            command["SYNC_POS"] = {"ARCSEC", value};
+            command = {{"SYNC_POS", {{"ARCSEC", value}}}};
             break;
         case UNIT_STEPS:
-            command["SYNC_POS"] = {"STEPS", value};
+            command = {{"SYNC_POS", {{"STEP", static_cast<int>(value)}}}};
             break;
     }
 
-    json jsonRequest = {"req", {"cmd", {"MOT2", command}}};
-    return m_Communication->sendCommand(jsonRequest);
+    return m_Communication->command(MOT_2, command);
 }
 
 /******************************************************************************************************
@@ -521,9 +657,9 @@ bool Arco::sync(Units unit, double value)
 bool Arco::isBusy()
 {
     json status;
-    if (m_Communication->motorGet(MOT_2, "STATUS", status))
+    if (m_Communication->get(MOT_2, "STATUS", status))
     {
-        return (status["BUSY"].get<int>() == 1);
+        return status["BUSY"] == 1;
     }
     return false;
 }
@@ -531,9 +667,17 @@ bool Arco::isBusy()
 /******************************************************************************************************
  *
 *******************************************************************************************************/
+bool Arco::getStatus(json &status)
+{
+    return m_Communication->get(MOT_2, "STATUS", status);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
 bool Arco::stop()
 {
-    return m_Communication->motorCommand(MOT_2, {"MOT_STOP", ""});
+    return m_Communication->command(MOT_2, {{"MOT_STOP", ""}});
 }
 
 /******************************************************************************************************
@@ -541,7 +685,7 @@ bool Arco::stop()
 *******************************************************************************************************/
 bool Arco::calibrate()
 {
-    return m_Communication->motorSet(MOT_2, {"CAL_STATUS", "exec"});
+    return m_Communication->set(MOT_2, {{"CAL_STATUS", "exec"}});
 }
 
 /******************************************************************************************************
@@ -550,7 +694,7 @@ bool Arco::calibrate()
 bool Arco::isCalibrating()
 {
     std::string value;
-    if (m_Communication->motorGet(MOT_2, "CAL_STATUS", value))
+    if (m_Communication->get(MOT_2, "CAL_STATUS", value))
     {
         return value == "exec";
     }
@@ -562,7 +706,7 @@ bool Arco::isCalibrating()
 *******************************************************************************************************/
 bool Arco::reverse(bool enabled)
 {
-    return m_Communication->motorCommand(MOT_2, {"REVERSE", enabled ? 1 : 0});
+    return m_Communication->set(MOT_2, {{"REVERSE", enabled ? 1 : 0}});
 }
 
 /******************************************************************************************************
@@ -571,10 +715,92 @@ bool Arco::reverse(bool enabled)
 bool Arco::isReversed()
 {
     int value;
-    if (m_Communication->motorGet(MOT_2, "REVERSE", value))
+    if (m_Communication->get(MOT_2, "REVERSE", value))
     {
         return value == 1;
     }
     return false;
 }
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Arco::getSerialNumber(std::string &response)
+{
+    return m_Communication->get(GENERIC_NODE, "ARCO_SN", response);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Arco::getFirmwareVersion(std::string &response)
+{
+    // JM 2022.07.22: Apparently not possible now in protocol.
+    response = "NA";
+    return true;
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool Arco::getMotorInfo(json &info)
+{
+    json jsonRequest = {{"req", {{"get", {{"MOT2", ""}}}}}};
+    return m_Communication->sendRequest(jsonRequest, &info);
+}
+
+/******************************************************************************************************
+ * GIOTTO
+*******************************************************************************************************/
+GIOTTO::GIOTTO(const std::string &name, int port)
+{
+    m_Communication.reset(new Communication(name, port));
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool GIOTTO::setLightEnabled(bool enabled)
+{
+    json jsonRequest = {{"req", {{"set", {{"LIGHT", enabled ? 1 : 0}}}}}};
+    return m_Communication->sendRequest(jsonRequest);
+}
+
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool GIOTTO::isLightEnabled()
+{
+    int value;
+    if (m_Communication->get(GENERIC_NODE, "LIGHT", value))
+    {
+        return value == 1;
+    }
+    return false;
+}
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool GIOTTO::getMaxBrightness(uint16_t &value)
+{
+    return m_Communication->get(GENERIC_NODE, "MAX_BRIGHTNESS", value);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool GIOTTO::setBrightness(uint16_t value)
+{
+    return m_Communication->set(GENERIC_NODE, {{"BRIGHTNESS", value}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool GIOTTO::getBrightness(uint16_t &value)
+{
+    return m_Communication->get(GENERIC_NODE, "BRIGHTNESS", value);
+}
+
 }

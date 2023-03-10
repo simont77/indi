@@ -76,10 +76,10 @@ double PMC8_AXIS1_SCALE = PMC8_EXOS2_AXIS1_SCALE;
 #define PMC8_RETRY_DELAY 30000 /* how long to wait before retrying i/o */
 #define PMC8_MAX_IO_ERROR_THRESHOLD 2 /* how many consecutive read timeouts before trying to reset the connection */
 
-#define PMC8_RATE_SIDEREAL 15.0
-#define PMC8_RATE_LUNAR 14.685
-#define PMC8_RATE_SOLAR 15.041
-#define PMC8_RATE_KING 15.0369
+#define PMC8_RATE_SIDEREAL 15.000
+#define PMC8_RATE_LUNAR 14.451
+#define PMC8_RATE_SOLAR 14.959
+#define PMC8_RATE_KING 14.996
 
 PMC8_CONNECTION_TYPE pmc8_connection         = PMC8_SERIAL_AUTO;
 bool pmc8_debug                 = false;
@@ -834,28 +834,28 @@ bool get_pmc8_tracking_data(int fd, double &rate, uint8_t &mode)
     int refmotor, tmotor;
 
     //get our current precise motor rate
-    bool rc = convert_precise_rate_to_motor(rate, &tmotor);
+    convert_precise_rate_to_motor(rate, &tmotor);
 
     //now check what sidereal would be
-    rc = convert_precise_rate_to_motor(PMC8_RATE_SIDEREAL, &refmotor);
+    convert_precise_rate_to_motor(PMC8_RATE_SIDEREAL, &refmotor);
     if (tmotor == refmotor) mode = PMC8_TRACK_SIDEREAL;
     else
     {
 
         //now check lunar
-        rc = convert_precise_rate_to_motor(PMC8_RATE_LUNAR, &refmotor);
+        convert_precise_rate_to_motor(PMC8_RATE_LUNAR, &refmotor);
         if (tmotor == refmotor) mode = PMC8_TRACK_LUNAR;
         else
         {
 
             //now check solar
-            rc = convert_precise_rate_to_motor(PMC8_RATE_SOLAR, &refmotor);
+            convert_precise_rate_to_motor(PMC8_RATE_SOLAR, &refmotor);
             if (tmotor == refmotor) mode = PMC8_TRACK_SOLAR;
             else
             {
 
                 //now check king
-                rc = convert_precise_rate_to_motor(PMC8_RATE_KING, &refmotor);
+                convert_precise_rate_to_motor(PMC8_RATE_KING, &refmotor);
                 if (tmotor == refmotor) mode = PMC8_TRACK_KING;
                 // must be custom
                 else mode = PMC8_TRACK_CUSTOM;

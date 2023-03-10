@@ -18,7 +18,8 @@ case "$OS" in
         brew install \
             git \
             cfitsio libnova libusb curl \
-            gsl jpeg fftw librtlsdr libev
+            gsl jpeg fftw librtlsdr libev \
+            qt@5
         ;;
     Linux)
         . /etc/os-release
@@ -31,15 +32,17 @@ case "$OS" in
                     git \
                     cmake build-essential zlib1g-dev \
                     libcfitsio-dev libnova-dev libusb-1.0-0-dev libcurl4-gnutls-dev \
-                    libgsl-dev libjpeg-dev libfftw3-dev librtlsdr-dev libev-dev
+                    libgsl-dev libjpeg-dev libfftw3-dev librtlsdr-dev libev-dev \
+                    qtbase5-dev
                 ;;
             fedora)
                 $(command -v sudo) dnf upgrade -y
                 $(command -v sudo) dnf install -y \
                     git \
                     cmake gcc-c++ zlib-devel \
-                    cfitsio-devel libnova-devel libusb-devel libcurl-devel \
-                    gsl-devel libjpeg-devel fftw-devel rtl-sdr-devel libev-devel
+                    cfitsio-devel libnova-devel libusb1-devel libcurl-devel \
+                    gsl-devel libjpeg-devel fftw-devel rtl-sdr-devel libev-devel \
+                    qt5-qtbase-devel
                 ;;
             centos)
                 # CentOS 8 dont have libnova-devel package

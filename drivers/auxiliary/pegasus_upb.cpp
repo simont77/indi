@@ -1587,8 +1587,7 @@ bool PegasusUPB::getPowerData()
     if (sendCommand("PC", res))
     {
         std::vector<std::string> result = split(res, ":");
-        if ( (version == UPB_V1 && result.size() != 3) ||
-                (version == UPB_V2 && result.size() != 4))
+        if (result.size() != 4)
         {
             LOGF_WARN("Received wrong number (%i) of power sensor data (%s). Retrying...", result.size(), res);
             return false;
@@ -1603,24 +1602,22 @@ bool PegasusUPB::getPowerData()
         PowerConsumptionNP.s = IPS_OK;
         IDSetNumber(&PowerConsumptionNP, nullptr);
 
-        if (version == UPB_V2)
+        try
         {
-            try
-            {
-                std::chrono::milliseconds uptime(std::stol(result[3]));
-                using dhours = std::chrono::duration<double, std::ratio<3600>>;
-                std::stringstream ss;
-                ss << std::fixed << std::setprecision(3) << dhours(uptime).count();
-                IUSaveText(&FirmwareT[FIRMWARE_UPTIME], ss.str().c_str());
-            }
-            catch(...)
-            {
-                IUSaveText(&FirmwareT[FIRMWARE_UPTIME], "NA");
-                LOGF_WARN("Failed to process uptime: %s", result[3].c_str());
-                return false;
-            }
-            IDSetText(&FirmwareTP, nullptr);
+            std::chrono::milliseconds uptime(std::stol(result[3]));
+            using dhours = std::chrono::duration<double, std::ratio<3600>>;
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(3) << dhours(uptime).count();
+            IUSaveText(&FirmwareT[FIRMWARE_UPTIME], ss.str().c_str());
         }
+        catch(...)
+        {
+            // Uptime not critical, so just put debug statement on failure.
+            IUSaveText(&FirmwareT[FIRMWARE_UPTIME], "NA");
+            LOGF_DEBUG("Failed to process uptime: %s", result[3].c_str());
+        }
+        IDSetText(&FirmwareTP, nullptr);
+
 
         lastPowerData = result;
         return true;
@@ -1760,7 +1757,7 @@ bool PegasusUPB::setupParams()
             uint32_t value = std::stol(res);
             if (value == UINT16_MAX)
             {
-                LOGF_WARN("Invalid maximum speed detected: %u. Please set maximum speed appropiate for your motor focus type (0-900)",
+                LOGF_WARN("Invalid maximum speed detected: %u. Please set maximum speed appropriate for your motor focus type (0-900)",
                           value);
                 FocuserSettingsNP.s = IPS_ALERT;
             }

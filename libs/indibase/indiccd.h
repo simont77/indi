@@ -171,7 +171,7 @@ class CCD : public DefaultDevice, GuiderInterface
         }
 
         /**
-         * @brief SetCCDCapability Set the CCD capabilities. Al fields must be initilized.
+         * @brief SetCCDCapability Set the CCD capabilities. Al fields must be initialized.
          * @param cap pointer to CCDCapability struct.
          */
         void SetCCDCapability(uint32_t cap);
@@ -530,6 +530,13 @@ class CCD : public DefaultDevice, GuiderInterface
         virtual void GuideComplete(INDI_EQ_AXIS axis) override;
 
         /**
+         * @brief UploadComplete Signal that capture is completed and image was uploaded and/or saved successfully.
+         * @param targetChip Active exposure chip
+         * @note Child camera should override this function to receive notification on exposure upload completion.
+         */
+        virtual void UploadComplete(CCDChip *) {}
+
+        /**
          * @brief checkTemperatureTarget Checks the current temperature against target temperature and calculates
          * the next required temperature if there is a ramp. If the current temperature is within threshold of
          * target temperature, it sets the state as OK.
@@ -569,7 +576,7 @@ class CCD : public DefaultDevice, GuiderInterface
         char exposureStartTime[MAXINDINAME];
         double exposureDuration;
 
-        double primaryFocalLength, primaryAperture, guiderFocalLength, guiderAperture;
+        double snoopedFocalLength, snoopedAperture;
         bool InExposure;
         bool InGuideExposure;
         //bool RapidGuideEnabled;
@@ -714,12 +721,12 @@ class CCD : public DefaultDevice, GuiderInterface
             UPLOAD_PREFIX
         };
 
-        ISwitch TelescopeTypeS[2];
-        ISwitchVectorProperty TelescopeTypeSP;
+        // Telescope Information
+        INDI::PropertyNumber ScopeInfoNP {2};
         enum
         {
-            TELESCOPE_PRIMARY,
-            TELESCOPE_GUIDE
+            FocalLength,
+            Aperture
         };
 
         // Websocket Support
@@ -771,7 +778,7 @@ class CCD : public DefaultDevice, GuiderInterface
         uint32_t capability;
 
         bool m_ValidCCDRotation {false};
-        std::string m_ConfigCaptureFormatLabel;
+        std::string m_ConfigCaptureFormatName;
         int m_ConfigEncodeFormatIndex {-1};
         int m_ConfigFastExposureIndex {INDI_DISABLED};
 

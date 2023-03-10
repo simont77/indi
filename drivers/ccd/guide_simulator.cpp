@@ -42,9 +42,6 @@ GuideSim::GuideSim()
     streamPredicate = 0;
     terminateThread = false;
 
-    primaryFocalLength = 900; //  focal length of the telescope in millimeters
-    guiderFocalLength  = 300;
-
     time(&RunStart);
 }
 
@@ -122,8 +119,8 @@ bool GuideSim::initProperties()
 
     IUFillNumber(&SimulatorSettingsN[0], "SIM_XRES", "CCD X resolution", "%4.0f", 0, 8192, 0, 1280);
     IUFillNumber(&SimulatorSettingsN[1], "SIM_YRES", "CCD Y resolution", "%4.0f", 0, 8192, 0, 1024);
-    IUFillNumber(&SimulatorSettingsN[2], "SIM_XSIZE", "CCD X Pixel Size", "%4.2f", 0, 60, 0, 5.2);
-    IUFillNumber(&SimulatorSettingsN[3], "SIM_YSIZE", "CCD Y Pixel Size", "%4.2f", 0, 60, 0, 5.2);
+    IUFillNumber(&SimulatorSettingsN[2], "SIM_XSIZE", "CCD X Pixel Size", "%4.2f", 0, 60, 0, 2.4);
+    IUFillNumber(&SimulatorSettingsN[3], "SIM_YSIZE", "CCD Y Pixel Size", "%4.2f", 0, 60, 0, 2.4);
     IUFillNumber(&SimulatorSettingsN[4], "SIM_MAXVAL", "CCD Maximum ADU", "%4.0f", 0, 65000, 0, 65000);
     IUFillNumber(&SimulatorSettingsN[5], "SIM_BIAS", "CCD Bias", "%4.0f", 0, 6000, 0, 10);
     IUFillNumber(&SimulatorSettingsN[6], "SIM_SATURATION", "Saturation Mag", "%4.1f", 0, 20, 0, 1.0);
@@ -196,10 +193,6 @@ bool GuideSim::initProperties()
 
     setDriverInterface(getDriverInterface());
 
-    // Make Guide Scope ON by default
-    TelescopeTypeS[TELESCOPE_PRIMARY].s = ISS_OFF;
-    TelescopeTypeS[TELESCOPE_GUIDE].s = ISS_ON;
-
     return true;
 }
 
@@ -225,7 +218,7 @@ void GuideSim::ISGetProperties(const char * dev)
     defineProperty(&SimulatorSettingsNP);
     defineProperty(&EqPENP);
     defineProperty(&SimulateRgbSP);
-    defineProperty(&ToggleTimeoutSP);
+    defineProperty(ToggleTimeoutSP);
 }
 
 bool GuideSim::updateProperties()
@@ -276,12 +269,6 @@ int GuideSim::SetTemperature(double temperature)
 
 bool GuideSim::StartExposure(float duration)
 {
-    if (std::isnan(RA) && std::isnan(Dec))
-    {
-        LOG_ERROR("Telescope coordinates missing. Make sure telescope is connected and its name is set in CCD Options.");
-        return false;
-    }
-
     //  for the simulator, we can just draw the frame now
     //  and it will get returned at the right time
     //  by the timer routines
@@ -397,7 +384,6 @@ int GuideSim::DrawCcdFrame(INDI::CCDChip * targetChip)
 {
     //  CCD frame is 16 bit data
     double exposure_time;
-    double targetFocalLength;
 
     uint16_t * ptr = reinterpret_cast<uint16_t *>(targetChip->getFrameBuffer());
 
@@ -406,15 +392,9 @@ int GuideSim::DrawCcdFrame(INDI::CCDChip * targetChip)
     else
         exposure_time = ExposureRequest;
 
-    if (GainN[0].value > 50)
-        exposure_time *= sqrt(GainN[0].value - 50);
-    else if (GainN[0].value < 50)
-        exposure_time /= sqrt(50 - GainN[0].value);
+    exposure_time *= (1 + sqrt(GainN[0].value));
 
-    if (TelescopeTypeS[TELESCOPE_PRIMARY].s == ISS_ON)
-        targetFocalLength = primaryFocalLength;
-    else
-        targetFocalLength = guiderFocalLength;
+    auto targetFocalLength = ScopeInfoNP[FocalLength].getValue() > 0 ? ScopeInfoNP[FocalLength].getValue() : snoopedFocalLength;
 
     if (ShowStarField)
     {
@@ -506,6 +486,12 @@ int GuideSim::DrawCcdFrame(INDI::CCDChip * targetChip)
 #endif
             currentRA  = RA;
             currentDE = Dec;
+
+            if (std::isnan(currentRA))
+            {
+                currentRA = 0;
+                currentDE = 0;
+            }
 
             INDI::IEquatorialCoordinates epochPos { currentRA, currentDE }, J2000Pos { 0, 0 };
             // Convert from JNow to J2000

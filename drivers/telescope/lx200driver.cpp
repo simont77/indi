@@ -1650,7 +1650,7 @@ int MoveTo(int fd, int direction)
     return 0;
 }
 
-int SendPulseCmd(int fd, int direction, int duration_msec)
+int SendPulseCmd(int fd, int direction, int duration_msec, bool wait_after_command, int max_wait_ms)
 {
     DEBUGFDEVICE(lx200Name, DBG_SCOPE, "<%s>", __FUNCTION__);
     int nbytes_write = 0;
@@ -1691,6 +1691,13 @@ int SendPulseCmd(int fd, int direction, int duration_msec)
     tty_write_string(fd, cmd, &nbytes_write);
 
     tcflush(fd, TCIFLUSH);
+
+    if(wait_after_command){
+        if (duration_msec > max_wait_ms)
+            duration_msec = max_wait_ms;
+        struct timespec duration_ns = {.tv_sec = 0,.tv_nsec = duration_msec*1000000};
+        nanosleep(&duration_ns, NULL);
+    }
     return 0;
 }
 

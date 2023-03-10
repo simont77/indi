@@ -65,7 +65,7 @@ LX200_TeenAstro::LX200_TeenAstro()
     SetTelescopeCapability(
         TELESCOPE_CAN_GOTO | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_PARK | TELESCOPE_CAN_ABORT |
         TELESCOPE_HAS_TIME | TELESCOPE_HAS_LOCATION | TELESCOPE_HAS_PIER_SIDE |
-        TELESCOPE_HAS_TRACK_MODE  | TELESCOPE_CAN_CONTROL_TRACK);
+        TELESCOPE_HAS_TRACK_MODE  | TELESCOPE_CAN_CONTROL_TRACK, 5);
 
     LOG_DEBUG("Initializing from LX200 TeenAstro device...");
 }
@@ -418,7 +418,8 @@ bool LX200_TeenAstro::Goto(double r, double d)
         IDSetNumber(&EqNP, nullptr);
 
         // sleep for 100 mseconds
-        usleep(100000);
+        const struct timespec ms100_delay = {.tv_sec = 0, .tv_nsec = 100000000};
+        nanosleep(&ms100_delay, NULL);
     }
 
     if (!isSimulation())
@@ -519,7 +520,7 @@ bool LX200_TeenAstro::SetCurrentPark()
     }
     SetAxis1Park(currentRA);
     SetAxis2Park(currentDEC);
-    LOG_WARN("Park Value set to current postion");
+    LOG_WARN("Park Value set to current position");
     return true;
 }
 

@@ -154,20 +154,20 @@ bool Beaver::updateProperties()
         }
         TimerHit();
 
-        defineProperty(&VersionTP);
-        defineProperty(&HomePositionNP);
-        defineProperty(&HomeOptionsSP);
-        defineProperty(&RotatorCalibrationSP);
-        defineProperty(&GotoHomeSP);
-        defineProperty(&RotatorSettingsNP);
-        defineProperty(&RotatorStatusTP);
+        defineProperty(VersionTP);
+        defineProperty(HomePositionNP);
+        defineProperty(HomeOptionsSP);
+        defineProperty(RotatorCalibrationSP);
+        defineProperty(GotoHomeSP);
+        defineProperty(RotatorSettingsNP);
+        defineProperty(RotatorStatusTP);
         if (shutterOnLine())
         {
-            defineProperty(&ShutterCalibrationSP);
-            defineProperty(&ShutterSettingsNP);
-            defineProperty(&ShutterSettingsTimeoutNP);
-            defineProperty(&ShutterStatusTP);
-            defineProperty(&ShutterVoltsNP);
+            defineProperty(ShutterCalibrationSP);
+            defineProperty(ShutterSettingsNP);
+            defineProperty(ShutterSettingsTimeoutNP);
+            defineProperty(ShutterStatusTP);
+            defineProperty(ShutterVoltsNP);
         }
     }
     else
@@ -486,7 +486,7 @@ void Beaver::TimerHit()
     {
 
         // Dome Parked
-        if (rotatorIsParked() & (getDomeState() == DOME_PARKING))
+        if (rotatorIsParked() && (getDomeState() == DOME_PARKING))
         {
             SetParked(true);
             std::string rStatus = "Parked";

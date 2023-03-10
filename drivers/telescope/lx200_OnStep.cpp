@@ -50,7 +50,7 @@ LX200_OnStep::LX200_OnStep() : LX200Generic(), WI(this), RotatorInterface(this)
     currentCatalog    = LX200_STAR_C;
     currentSubCatalog = 0;
 
-    setVersion(1, 16);   // don't forget to update libindi/drivers.xml
+    setVersion(1, 17);   // don't forget to update libindi/drivers.xml
 
     setLX200Capability(LX200_HAS_TRACKING_FREQ | LX200_HAS_SITES | LX200_HAS_ALIGNMENT_TYPE | LX200_HAS_PULSE_GUIDING |
                        LX200_HAS_PRECISE_TRACKING_FREQ);
@@ -960,13 +960,13 @@ bool LX200_OnStep::ISNewNumber(const char *dev, const char *name, double values[
             }
             if (nset == 2)
             {
-                if (setMinElevationLimit(PortFD, (int)minAlt) < 0)
+                if (setMinElevationLimit(PortFD, (int)maxAlt) < 0)
                 {
                     ElevationLimitNP.s = IPS_ALERT;
                     IDSetNumber(&ElevationLimitNP, "Error setting min elevation limit.");
                 }
 
-                if (setMaxElevationLimit(PortFD, (int)maxAlt) < 0)
+                if (setMaxElevationLimit(PortFD, (int)minAlt) < 0)
                 {
                     ElevationLimitNP.s = IPS_ALERT;
                     IDSetNumber(&ElevationLimitNP, "Error setting max elevation limit.");
@@ -1214,8 +1214,7 @@ bool LX200_OnStep::ISNewSwitch(const char *dev, const char *name, ISState *state
         // Reticlue +/- Buttons
         if (!strcmp(name, ReticSP.name))
         {
-            long ret = 0;
-
+            int ret = 0;
             IUUpdateSwitch(&ReticSP, states, names, n);
             ReticSP.s = IPS_OK;
 
@@ -1232,6 +1231,7 @@ bool LX200_OnStep::ISNewSwitch(const char *dev, const char *name, ISState *state
                 IDSetSwitch(&ReticSP, "Dark");
             }
 
+            INDI_UNUSED(ret);
             IUResetSwitch(&ReticSP);
             IDSetSwitch(&ReticSP, nullptr);
             return true;
@@ -2421,7 +2421,7 @@ bool LX200_OnStep::ReadScopeStatus()
                     if ((capabilities | TELESCOPE_HAS_PEC) != capabilities)
                     {
                         LOG_INFO("Telescope detected having PEC, setting that capability");
-                        LOGF_DEBUG("capabilites = %x", capabilities);
+                        LOGF_DEBUG("capabilities = %x", capabilities);
                         capabilities |= TELESCOPE_HAS_PEC;
                         SetTelescopeCapability(capabilities, 10 );
                         LX200_OnStep::updateProperties();
@@ -2478,7 +2478,7 @@ bool LX200_OnStep::ReadScopeStatus()
                 if ((capabilities | TELESCOPE_HAS_PIER_SIDE) != capabilities)
                 {
                     LOG_INFO("Telescope detected having Pier Side, adding that capability (many messages duplicated)");
-                    LOGF_DEBUG("capabilites = %x", capabilities);
+                    LOGF_DEBUG("capabilities = %x", capabilities);
                     capabilities |= TELESCOPE_HAS_PIER_SIDE;
                     SetTelescopeCapability(capabilities, 10 );
                     LX200_OnStep::updateProperties();
@@ -3542,7 +3542,7 @@ bool LX200_OnStep::updateLocation(double latitude, double longitude, double elev
     return true;
 }
 
-int LX200_OnStep::setMaxElevationLimit(int fd, int max)   // According to standard command is :SoDD*#       Tested
+int LX200_OnStep::setMinElevationLimit(int fd, int max)   // According to standard command is :SoDD*#       Tested
 {
     LOGF_INFO("<%s>", __FUNCTION__);
 

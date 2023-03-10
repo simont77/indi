@@ -69,7 +69,7 @@ const char *OpenWeatherMap::getDefaultName()
 void OpenWeatherMap::ISGetProperties(const char *dev)
 {
     INDI::Weather::ISGetProperties(dev);
-    defineProperty(&owmAPIKeyTP);
+    defineProperty(owmAPIKeyTP);
 }
 
 bool OpenWeatherMap::Connect()
@@ -197,10 +197,10 @@ IPState OpenWeatherMap::updateWeather()
     double clouds = 0;
     int code = 0;
 
-    json weatherReport = json::parse(readBuffer);
-
     try
     {
+        json weatherReport = json::parse(readBuffer);
+
         weatherReport["weather"][0]["id"].get_to(code);
         if (code >= 200 && code < 300)
         {
@@ -282,7 +282,7 @@ bool OpenWeatherMap::saveConfigItems(FILE *fp)
 {
     INDI::Weather::saveConfigItems(fp);
 
-    IUSaveConfigText(fp, &owmAPIKeyTP);
+    owmAPIKeyTP.save(fp);
 
     return true;
 }

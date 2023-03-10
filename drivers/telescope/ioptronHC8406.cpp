@@ -114,7 +114,7 @@ ioptronHC8406::ioptronHC8406()
     setLX200Capability(LX200_HAS_FOCUS | LX200_HAS_PULSE_GUIDING);
     SetTelescopeCapability(TELESCOPE_CAN_PARK | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO |
                            TELESCOPE_CAN_ABORT | TELESCOPE_HAS_TIME | TELESCOPE_HAS_LOCATION |
-                           TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK);
+                           TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK, 4);
 
 }
 
@@ -672,7 +672,7 @@ int ioptronHC8406::setioptronHC8406Longitude(double Long)
 
     getSexComponents(Long, &d, &m, &s);
 
-    snprintf(temp_string, sizeof(temp_string), ":Sg %03d*%02d:%02d#", abs(d), m, s);
+    snprintf(temp_string, sizeof(temp_string), ":Sg %c%03d*%02d:%02d#", sign, abs(d), m, s);
 
     return (setioptronHC8406StandardProcedure(PortFD, temp_string));
 }
