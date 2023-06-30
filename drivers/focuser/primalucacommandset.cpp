@@ -73,14 +73,17 @@ bool Communication::sendRequest(const json &command, json *response)
     if (response == nullptr)
         return true;
 
-    char read_buf[DRIVER_LEN] = {0};
-    if ( (tty_rc = tty_read_section(m_PortFD, read_buf, DRIVER_STOP_CHAR, DRIVER_TIMEOUT, &nbytes_read)) != TTY_OK)
-    {
-        char errorMessage[MAXRBUF] = {0};
-        tty_error_msg(tty_rc, errorMessage, MAXRBUF);
-        LOGF_ERROR("Serial write error: %s", errorMessage);
-        return false;
-    }
+    char read_buf[DRIVER_LEN];
+    do {
+        memset(read_buf, 0, sizeof(read_buf));
+        if ( (tty_rc = tty_read_section(m_PortFD, read_buf, DRIVER_STOP_CHAR, DRIVER_TIMEOUT, &nbytes_read)) != TTY_OK)
+        {
+            char errorMessage[MAXRBUF] = {0};
+            tty_error_msg(tty_rc, errorMessage, MAXRBUF);
+            LOGF_ERROR("Serial write error: %s", errorMessage);
+            return false;
+        }
+    } while (strncmp(read_buf, "ERR:", 4) == 0 && (LOGF_WARN("%s", read_buf), true));
 
     LOGF_DEBUG("<RES> %s", read_buf);
 
@@ -179,9 +182,29 @@ template <typename T> bool Communication::genericRequest(const std::string &node
             try
             {
                 if (node.empty())
-                    jsonResponse[type][key].get_to(*response);
+                {
+                    if (jsonResponse[type].contains(key))
+                        jsonResponse[type][key].get_to(*response);
+                    else if (jsonResponse[type].contains("ERROR"))
+                    {
+                        std::string error = jsonResponse[type]["ERROR"];
+                        LOGF_ERROR("Error: %s", error.c_str());
+                        return false;
+                    }
+                }
                 else
-                    jsonResponse[type][node][key].get_to(*response);
+                {
+                    if (jsonResponse[type][node].contains(key))
+                        jsonResponse[type][node][key].get_to(*response);
+                    else if (jsonResponse[type][node].contains("ERROR"))
+                    {
+                        std::string error = jsonResponse[type][node]["ERROR"];
+                        LOGF_ERROR("Error: %s", error.c_str());
+                        return false;
+                    }
+                }
+
+
             }
             catch (json::exception &e)
             {
@@ -402,7 +425,7 @@ bool SestoSenso2::storeAsMinPosition()
 *******************************************************************************************************/
 bool SestoSenso2::goOutToFindMaxPos()
 {
-    return m_Communication->command(MOT_1, {"CAL_FOCUSER", "GoOutToFindMaxPos"});
+    return m_Communication->command(MOT_1, {{"CAL_FOCUSER", "GoOutToFindMaxPos"}});
 }
 
 /******************************************************************************************************
@@ -578,33 +601,17 @@ bool Arco::getAbsolutePosition(Units unit, double &value)
     switch (unit)
     {
         case UNIT_DEGREES:
-            command = {{"POSITION", "DEG"}};
+            command = {{"POSITION_DEG", ""}};
             break;
         case UNIT_ARCSECS:
-            command = {{"POSITION", "ARCSEC"}};
+            command = {{"POSITION_ARCSEC", ""}};
             break;
         case UNIT_STEPS:
-            command = {{"POSITION", "STEP"}};
+            command = {{"POSITION_STEP", ""}};
             break;
     }
 
-
-    // For steps, we can value directly
-    if (unit == UNIT_STEPS)
-        return m_Communication->genericRequest("MOT2", "get", command, &value);
-    // For DEG and ARCSEC, a string is returned that we must parse.
-    // e.g. "10.000[DEG]"
-    else
-    {
-        std::string response;
-        if (m_Communication->genericRequest("MOT2", "get", command, &response))
-        {
-            sscanf(response.c_str(), "%lf", &value);
-            return true;
-        }
-    }
-
-    return false;
+    return m_Communication->genericRequest("MOT2", "get", command, &value);
 }
 
 /******************************************************************************************************
@@ -801,6 +808,103 @@ bool GIOTTO::setBrightness(uint16_t value)
 bool GIOTTO::getBrightness(uint16_t &value)
 {
     return m_Communication->get(GENERIC_NODE, "BRIGHTNESS", value);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+ALTO::ALTO(const std::string &name, int port)
+{
+    m_Communication.reset(new Communication(name, port));
+}
+
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::getModel(std::string &model)
+{
+    return m_Communication->get(GENERIC_NODE, "MODNAME", model);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::getStatus(json &status)
+{
+    return m_Communication->get(MOT_1, "STATUS", status);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::Park()
+{
+    return setPosition(0);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::UnPark()
+{
+    return setPosition(100);
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::setPosition(uint8_t value)
+{
+    return m_Communication->set(MOT_1, {{"POSITION", value}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::stop()
+{
+    return m_Communication->command(MOT_1, {{"MOT_STOP", ""}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::initCalibration()
+{
+    return m_Communication->command(MOT_1, {{"CAL_ALTO", "Init"}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::close(bool fast)
+{
+    return m_Communication->command(MOT_1, {{"CAL_ALTO", fast ? "Open_Fast" : "Open_Slow"}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::open(bool fast)
+{
+    return m_Communication->command(MOT_1, {{"CAL_ALTO", fast ? "Close_Fast" : "Close_Slow"}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::storeClosedPosition()
+{
+    return m_Communication->command(MOT_1, {{"CAL_ALTO", "StoreAsClosedPos"}});
+}
+
+/******************************************************************************************************
+ *
+*******************************************************************************************************/
+bool ALTO::storeOpenPosition()
+{
+    return m_Communication->command(MOT_1, {{"CAL_ALTO", "StoreAsMaxOpenPos"}});
 }
 
 }

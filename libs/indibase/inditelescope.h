@@ -170,6 +170,7 @@ class Telescope : public DefaultDevice
             TELESCOPE_HAS_TRACK_RATE              = 1 << 10, /** Does the telescope have custom track rates? */
             TELESCOPE_HAS_PIER_SIDE_SIMULATION    = 1 << 11, /** Does the telescope simulate the pier side property? */
             TELESCOPE_CAN_TRACK_SATELLITE         = 1 << 12, /** Can the telescope track satellites? */
+            TELESCOPE_CAN_FLIP                    = 1 << 13, /** Does the telescope have a command for flipping? */
         } TelescopeCapability;
 
         Telescope();
@@ -213,6 +214,14 @@ class Telescope : public DefaultDevice
         bool CanSync()
         {
             return capability & TELESCOPE_CAN_SYNC;
+        }
+
+        /**
+         * @return True if telescope support sync operations
+         */
+        bool CanFlip()
+        {
+            return capability & TELESCOPE_CAN_FLIP;
         }
 
         /**
@@ -450,11 +459,19 @@ class Telescope : public DefaultDevice
         virtual bool ReadScopeStatus() = 0;
 
         /**
-         * \brief Move the scope to the supplied RA and DEC coordinates
-         * \return True if successful, false otherwise
-         * \note If not implemented by the child class, this function by default returns false with a
-         * warning message.
-         */
+        * \brief Move and flip the scope to the supplied RA and DEC coordinates
+        * \return True if successful, false otherwise
+        * \note If not implemented by the child class, this function by default returns false with a
+        * warning message.
+        */
+        virtual bool Flip(double ra, double dec);
+
+        /**
+        * \brief Move the scope to the supplied RA and DEC coordinates
+        * \return True if successful, false otherwise
+        * \note If not implemented by the child class, this function by default returns false with a
+        * warning message.
+        */
         virtual bool Goto(double ra, double dec);
 
         /**
@@ -713,7 +730,7 @@ class Telescope : public DefaultDevice
 
         // On a coord_set message, sync, or slew
         ISwitchVectorProperty CoordSP;
-        ISwitch CoordS[3];
+        ISwitch CoordS[4];
 
         // A number vector that stores lattitude and longitude
         INumberVectorProperty LocationNP;
@@ -911,6 +928,7 @@ class Telescope : public DefaultDevice
         bool processTimeInfo(const char *utc, const char *offset);
         bool processLocationInfo(double latitude, double longitude, double elevation);
         void triggerSnoop(const char *driverName, const char *propertyName);
+        void generateCoordSet();
 
         /**
          * @brief LoadParkXML Read and process park XML data.
