@@ -33,9 +33,7 @@ Updated driver to use INDI::Telescope (JM)
 #include "lx200_16.h"
 #include "lx200_OnStep.h"
 #include "lx200_OpenAstroTech.h"
-#include "lx200ap.h"
 #include "lx200ap_v2.h"
-#include "lx200ap_gtocp2.h"
 #include "lx200classic.h"
 #include "lx200fs2.h"
 #include "lx200gemini.h"
@@ -54,7 +52,7 @@ Updated driver to use INDI::Telescope (JM)
 
     /* There is _one_ binary for all LX200 drivers, but each binary is renamed
     ** to its device name (i.e. lx200gps, lx200_16..etc). The main function will
-    ** fetch from std args the binary name and ISInit will create the apporpiate
+    ** fetch from std args the binary name and ISInit will create the appropriate
     ** device afterwards. If the binary name does not match any known devices,
     ** we simply create a generic device.
     */
@@ -100,16 +98,6 @@ static class Loader
             {
                 IDLog("initializing from Astrophysics V2 device...\n");
                 telescope.reset(new LX200AstroPhysicsV2());
-            }
-            else if (strstr(__progname, "indi_lx200ap_gtocp2"))
-            {
-                IDLog("initializing from Astrophysics GTOCP2 device...\n");
-                telescope.reset(new LX200AstroPhysicsGTOCP2());
-            }
-            else if (strstr(__progname, "indi_lx200ap"))
-            {
-                IDLog("initializing from Astrophysics device...\n");
-                telescope.reset(new LX200AstroPhysics());
             }
             else if (strstr(__progname, "indi_lx200gemini"))
             {

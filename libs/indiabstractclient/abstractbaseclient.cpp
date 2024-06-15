@@ -32,7 +32,7 @@
 #if defined(_MSC_VER)
 #define snprintf _snprintf
 #pragma warning(push)
-///@todo Introduce plattform indipendent safe functions as macros to fix this
+///@todo Introduce platform independent safe functions as macros to fix this
 #pragma warning(disable : 4996)
 #endif
 
@@ -126,8 +126,8 @@ int AbstractBaseClientPrivate::deleteDevice(const char *devName, char *errmsg)
 {
     if (auto device = watchDevice.getDeviceByName(devName))
     {
-        device.detach();
         watchDevice.deleteDevice(device);
+        device.detach();
         return 0;
     }
     snprintf(errmsg, MAXRBUF, "Device %s not found", devName);

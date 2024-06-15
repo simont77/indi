@@ -3,7 +3,7 @@
     GM1000HPS GM2000QCI GM2000HPS GM3000HPS GM4000QCI GM4000HPS AZ2000
     Mount Command Protocol 2.14.11
 
-    Copyright (C) 2017-2020 Hans Lambermont
+    Copyright (C) 2017-2023 Hans Lambermont
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -78,7 +78,7 @@ LX200_10MICRON::LX200_10MICRON() : LX200Generic()
         4
     );
 
-    setVersion(1, 1);
+    setVersion(1, 2); // don't forget to update drivers.xml
 }
 
 // Called by INDI::DefaultDevice::ISGetProperties
@@ -572,6 +572,35 @@ bool LX200_10MICRON::UnPark()
     return true;
 }
 
+bool LX200_10MICRON::SetTrackEnabled(bool enabled)
+{
+    // :AL#
+    // Stops tracking.
+    // Returns: nothing
+    // :AP#
+    // Starts tracking.
+    // Returns: nothing
+    if (enabled)
+    {
+        LOG_INFO("Start tracking.");
+        if (setStandardProcedureWithoutRead(fd, "#:AP#") < 0)
+        {
+            LOG_ERROR("Start tracking command failed");
+            return false;
+        }
+    }
+    else
+    {
+        LOG_INFO("Stop tracking.");
+        if (setStandardProcedureWithoutRead(fd, "#:AL#") < 0)
+        {
+            LOG_ERROR("Stop tracking command failed");
+            return false;
+        }
+    }
+    return true;
+}
+
 bool LX200_10MICRON::getUnattendedFlipSetting()
 {
     // #:Guaf#
@@ -641,7 +670,7 @@ bool LX200_10MICRON::SyncConfigBehaviour(bool cmcfg)
     // #:CMCFGn#
     // Configures the behaviour of the :CM# and :CMR# commands depending on the value
     // of n. If n=0, :the commands :CM# and :CMR# work in the default mode, i.e. they
-    // synchronize the position ot the mount with the coordinates of the currently selected
+    // synchronize the position to the mount with the coordinates of the currently selected
     // target by correcting the axis offset values. If n=1, the commands :CM# and :CMR#
     // work by using the synchronization position as an additional alignment star for refining
     // the alignment model.
@@ -779,7 +808,7 @@ bool LX200_10MICRON::SetTLEfromDatabase(int tleN)
 bool LX200_10MICRON::CalculateSatTrajectory(std::string start_pass_isodatetime, std::string end_pass_isodatetime)
 {
     // #:TLEPJD,min#
-    // Precalulates the first transit of the satellite with the currently loaded orbital elements,
+    // Precalculates the first transit of the satellite with the currently loaded orbital elements,
     // starting from Julian Date JD and for a period of min minutes, where min is from 1 to 1440.
     // Two-line elements have to be loaded with the :TLEL command.
     // Returns:

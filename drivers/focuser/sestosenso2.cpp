@@ -104,7 +104,7 @@ bool SestoSenso2::initProperties()
     MotorHoldSP[MOTOR_HOLD_ON].fill("HOLD_ON", "Hold On", ISS_OFF);
     MotorHoldSP[MOTOR_HOLD_OFF].fill("HOLD_OFF", "Hold Off", ISS_OFF);
     MotorHoldSP.fill(getDeviceName(), "MOTOR_HOLD", "Motor Hold", MAIN_CONTROL_TAB,
-                       IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+                     IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 
     // Override the default Max. Position to make it Read-Only
     IUFillNumberVector(&FocusMaxPosNP, FocusMaxPosN, 1, getDeviceName(), "FOCUS_MAX", "Max. Position", MAIN_CONTROL_TAB, IP_RO,
@@ -331,7 +331,6 @@ bool SestoSenso2::updatePosition()
         return false;
 
     FocusAbsPosN[0].value = steps;
-    FocusAbsPosNP.s = IPS_OK;
     return true;
 }
 
@@ -709,7 +708,7 @@ bool SestoSenso2::ISNewSwitch(const char *dev, const char *name, ISState *states
                 LOG_INFO("Motor hold ON. Do NOT attempt to manually adjust the focuser!");
                 if (MotorCurrentNP[MOTOR_CURR_HOLD].getValue() < 2.0)
                 {
-                    LOGF_WARN("Motor hold current set to %.1f: This may be insufficent to hold focus",
+                    LOGF_WARN("Motor hold current set to %.1f: This may be insufficient to hold focus",
                               MotorCurrentNP[MOTOR_CURR_HOLD].getValue());
                 }
             }
@@ -895,13 +894,11 @@ bool SestoSenso2::AbortFocuser()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 void SestoSenso2::checkMotionProgressCallback()
 {
+    IDSetNumber(&FocusAbsPosNP, nullptr);
+    lastPos = FocusAbsPosN[0].value;
     if (isMotionComplete())
     {
-        FocusAbsPosNP.s = IPS_OK;
-        FocusRelPosNP.s = IPS_OK;
         IDSetNumber(&FocusRelPosNP, nullptr);
-        IDSetNumber(&FocusAbsPosNP, nullptr);
-        lastPos = FocusAbsPosN[0].value;
 
         if (CalibrationSP.getState() == IPS_BUSY)
         {
@@ -911,14 +908,11 @@ void SestoSenso2::checkMotionProgressCallback()
         }
         else
             LOG_INFO("Focuser reached requested position.");
+        FocusAbsPosNP.s = IPS_OK;
+        FocusRelPosNP.s = IPS_OK;
         return;
     }
-    else
-    {
-        IDSetNumber(&FocusAbsPosNP, nullptr);
-    }
 
-    lastPos = FocusAbsPosN[0].value;
     m_MotionProgressTimer.start(500);
 }
 
@@ -985,7 +979,7 @@ void SestoSenso2::TimerHit()
             }
         }
 
-        // Also use temparature poll rate for tracking input voltage
+        // Also use temperature poll rate for tracking input voltage
         rc = updateVoltageIn();
         if (rc)
         {

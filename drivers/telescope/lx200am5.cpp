@@ -35,7 +35,7 @@
 
 LX200AM5::LX200AM5()
 {
-    setVersion(1, 0);
+    setVersion(1, 1);
 
     setLX200Capability(LX200_HAS_PULSE_GUIDING);
 
@@ -54,13 +54,15 @@ bool LX200AM5::initProperties()
 {
     LX200Generic::initProperties();
 
-    SetParkDataType(PARK_NONE);
+    SetParkDataType(PARK_SIMPLE);
     timeFormat = LX200_24;
 
     tcpConnection->setDefaultHost("192.168.4.1");
     tcpConnection->setDefaultPort(4030);
     tcpConnection->setLANSearchEnabled(true);
-    setActiveConnection(tcpConnection);
+
+    if (strstr(getDeviceName(), "WiFi"))
+        setActiveConnection(tcpConnection);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// Properties
@@ -93,7 +95,7 @@ bool LX200AM5::initProperties()
 
     // Home/Zero position
     HomeSP[0].fill("GO", "Go", ISS_OFF);
-    HomeSP.fill(getDeviceName(), "GO_HOME", "Home", MAIN_CONTROL_TAB, IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
+    HomeSP.fill(getDeviceName(), "TELESCOPE_HOME", "Home", MAIN_CONTROL_TAB, IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
     // Guide Rate
     GuideRateNP[0].fill("RATE", "Rate", "%.2f", 0.1, 0.9, 0.1, 0.5);
@@ -171,20 +173,7 @@ void LX200AM5::setup()
     //    MountTypeSP.setState(setMountType(MountTypeSP.findOnSwitchIndex()) ? IPS_OK : IPS_ALERT);
     //    MountTypeSP.apply();
 
-    if (InitPark())
-    {
-        // If loading parking data is successful, we just set the default parking values.
-        SetAxis1ParkDefault(LocationN[LOCATION_LATITUDE].value >= 0 ? 0 : 180);
-        SetAxis2ParkDefault(LocationN[LOCATION_LATITUDE].value);
-    }
-    else
-    {
-        // Otherwise, we set all parking data to default in case no parking data is found.
-        SetAxis1Park(LocationN[LOCATION_LATITUDE].value >= 0 ? 0 : 180);
-        SetAxis2Park(LocationN[LOCATION_LATITUDE].value);
-        SetAxis1ParkDefault(LocationN[LOCATION_LATITUDE].value >= 0 ? 0 : 180);
-        SetAxis2ParkDefault(LocationN[LOCATION_LATITUDE].value);
-    }
+    InitPark();
 
     getMountType();
     getTrackMode();
@@ -471,6 +460,16 @@ bool LX200AM5::Park()
     if (rc)
         TrackState = SCOPE_PARKING;
     return rc;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+///
+/////////////////////////////////////////////////////////////////////////////
+bool LX200AM5::UnPark()
+{
+    TrackState = SCOPE_IDLE;
+    SetParked(false);
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////

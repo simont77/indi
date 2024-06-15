@@ -106,7 +106,6 @@ void AstrometryDriver::ISGetProperties(const char *dev)
     DefaultDevice::ISGetProperties(dev);
 
     defineProperty(&ActiveDeviceTP);
-    loadConfig(true, "ACTIVE_DEVICES");
 }
 
 bool AstrometryDriver::updateProperties()
@@ -297,7 +296,7 @@ bool AstrometryDriver::processBLOB(uint8_t *data, uint32_t size, uint32_t len)
 
         if (destLen != size)
         {
-            LOGF_WARN("Discrepency between uncompressed data size %ld and expected size %ld",
+            LOGF_WARN("Discrepancy between uncompressed data size %ld and expected size %ld",
                       size, destLen);
         }
 

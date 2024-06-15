@@ -15,6 +15,16 @@ target_link_libraries(indi_robo_focus indidriver)
 install(TARGETS indi_robo_focus RUNTIME DESTINATION bin)
 
 # ############### Robo Focuser ################
+# ############### iEAF Focuser ################
+SET(ieaffocus_SRC
+    ieaffocus.cpp)
+
+add_executable(indi_ieaf_focus ${ieaffocus_SRC})
+target_link_libraries(indi_ieaf_focus indidriver)
+install(TARGETS indi_ieaf_focus RUNTIME DESTINATION bin)
+
+
+# ############### iEAF Focuser ################
 SET(fcusb_SRC
     fcusb.cpp)
 
@@ -126,7 +136,7 @@ SET(sesto2_SRC
 )
 
 add_executable(indi_sestosenso2_focus ${sesto2_SRC})
-target_link_libraries(indi_sestosenso2_focus indidriver)
+target_link_libraries(indi_sestosenso2_focus indidriver ${JSONLIB})
 install(TARGETS indi_sestosenso2_focus RUNTIME DESTINATION bin)
 
 # ############### Esatto Focuser ################
@@ -136,7 +146,7 @@ SET(esatto_SRC
 )
 
 add_executable(indi_esatto_focus ${esatto_SRC})
-target_link_libraries(indi_esatto_focus indidriver)
+target_link_libraries(indi_esatto_focus indidriver ${JSONLIB})
 install(TARGETS indi_esatto_focus RUNTIME DESTINATION bin)
 
 # ############### Esatto with Arco Focuser ################
@@ -146,7 +156,7 @@ SET(esarc_SRC
 )
 
 add_executable(indi_esattoarco_focus ${esarc_SRC})
-target_link_libraries(indi_esattoarco_focus indidriver)
+target_link_libraries(indi_esattoarco_focus indidriver ${JSONLIB})
 install(TARGETS indi_esattoarco_focus RUNTIME DESTINATION bin)
 
 # ############### Televue FocusMaster ################
@@ -192,6 +202,14 @@ SET(pegasusfocuscube_SRC
 add_executable(indi_pegasus_focuscube ${pegasusfocuscube_SRC})
 target_link_libraries(indi_pegasus_focuscube indidriver)
 install(TARGETS indi_pegasus_focuscube RUNTIME DESTINATION bin)
+
+# ############### Pegasus FocusCube3 Focuser ################
+SET(pegasusfocuscube3_SRC
+    pegasus_focuscube3.cpp)
+
+add_executable(indi_pegasus_focuscube3 ${pegasusfocuscube3_SRC})
+target_link_libraries(indi_pegasus_focuscube3 indidriver)
+install(TARGETS indi_pegasus_focuscube3 RUNTIME DESTINATION bin)
 
 # ############### Pegasus ProdigyMF Focuser ################
 SET(pegasusprodigyMF_SRC
@@ -240,6 +258,15 @@ SET(steeldrive_SRC
 add_executable(indi_steeldrive_focus ${steeldrive_SRC})
 target_link_libraries(indi_steeldrive_focus indidriver)
 install(TARGETS indi_steeldrive_focus RUNTIME DESTINATION bin)
+
+################ Alluna TCS2 Focuser ################
+
+SET(allunatcs2_SRC
+    alluna_tcs2.cpp)
+
+add_executable(indi_alluna_tcs2 ${allunatcs2_SRC})
+target_link_libraries(indi_alluna_tcs2 indidriver)
+install(TARGETS indi_alluna_tcs2 RUNTIME DESTINATION bin)
 
 # ############### FocusLynx Focuser ################
 SET(focuslynx_SRC

@@ -57,7 +57,7 @@ bool UranusMeteo::initProperties()
 
     // To distinguish them from GPS properties.
     WI::UpdatePeriodNP.setLabel("Weather Update");
-    WI::RefreshSP.setLabel("Weahter Refresh");
+    WI::RefreshSP.setLabel("Weather Refresh");
 
     addAuxControls();
 
@@ -257,6 +257,8 @@ IPState UranusMeteo::updateGPS()
             auto utcOffset = local->tm_gmtoff / 3600.0;
             // Convert to UTC time
             time_t utcTime = raw_time - utcOffset * 3600.0;
+            // Store in GPS
+            m_GPSTime = utcTime;
             // Get tm struct in UTC
             struct tm *utc = gmtime(&utcTime);
             // Format it
@@ -302,7 +304,7 @@ bool UranusMeteo::ISNewSwitch(const char * dev, const char * name, ISState * sta
 {
     if (dev && !strcmp(dev, getDeviceName()))
     {
-        if (processSwitch(dev, name, states, names, n))
+        if (WI::processSwitch(dev, name, states, names, n))
             return true;
     }
 
@@ -335,7 +337,7 @@ bool UranusMeteo::ISNewNumber(const char * dev, const char * name, double values
             return true;
         }
 
-        if (processNumber(dev, name, values, names, n))
+        if (WI::processNumber(dev, name, values, names, n))
             return true;
     }
 

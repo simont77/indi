@@ -26,13 +26,17 @@ namespace INDI
 template <typename T>
 PropertyBasicPrivateTemplate<T>::PropertyBasicPrivateTemplate(size_t count)
 #ifdef INDI_PROPERTY_RAW_CAST
-    : PropertyContainer<T>{*new PropertyView<T>()}
-    , PropertyPrivate(&this->typedProperty)
-    , raw{false}
+    : PropertyContainer<T>
+{
+    *new PropertyView<T>()
+}
+, PropertyPrivate(&this->typedProperty)
+, raw{false}
 #else
-    : PropertyPrivate(&property)
+    :
+    PropertyPrivate(&property)
 #endif
-    , widgets(count)
+, widgets(count)
 {
     this->typedProperty.setWidgets(widgets.data(), widgets.size());
 }
@@ -40,9 +44,12 @@ PropertyBasicPrivateTemplate<T>::PropertyBasicPrivateTemplate(size_t count)
 #ifdef INDI_PROPERTY_RAW_CAST
 template <typename T>
 PropertyBasicPrivateTemplate<T>::PropertyBasicPrivateTemplate(RawPropertyType *rawProperty)
-    : PropertyContainer<T>{*PropertyView<T>::cast(rawProperty)}
-    , PropertyPrivate(PropertyView<T>::cast(rawProperty))
-    , raw{true}
+    : PropertyContainer<T>
+{
+    *PropertyView<T>::cast(rawProperty)
+}
+, PropertyPrivate(PropertyView<T>::cast(rawProperty))
+, raw{true}
 { }
 #endif
 
@@ -68,6 +75,20 @@ template <typename T>
 PropertyBasic<T>::PropertyBasic(const std::shared_ptr<PropertyBasicPrivate> &dd)
     : Property(std::static_pointer_cast<PropertyPrivate>(dd))
 { }
+
+template <typename T>
+void PropertyBasic<T>::setDeviceName(const char *name)
+{
+    D_PTR(PropertyBasic);
+    d->typedProperty.setDeviceName(name);
+}
+
+template <typename T>
+void PropertyBasic<T>::setDeviceName(const std::string &name)
+{
+    D_PTR(PropertyBasic);
+    d->typedProperty.setDeviceName(name);
+}
 
 template <typename T>
 void PropertyBasic<T>::setName(const char *name)
@@ -144,6 +165,13 @@ void PropertyBasic<T>::setTimestamp(const std::string &timestamp)
 {
     D_PTR(PropertyBasic);
     d->typedProperty.setTimestamp(timestamp);
+}
+
+template <typename T>
+const char *PropertyBasic<T>::getDeviceName() const
+{
+    D_PTR(const PropertyBasic);
+    return d->typedProperty.getDeviceName();
 }
 
 template <typename T>
@@ -242,6 +270,13 @@ bool PropertyBasic<T>::isLabelMatch(const std::string &otherLabel) const
 {
     D_PTR(const PropertyBasic);
     return d->typedProperty.isLabelMatch(otherLabel);
+}
+
+template <typename T>
+bool PropertyBasic<T>::load()
+{
+    D_PTR(const PropertyBasic);
+    return d->typedProperty.load();
 }
 
 template <typename T>
@@ -379,7 +414,7 @@ const WidgetView<T> *PropertyBasic<T>::at(size_t index) const
 }
 
 template <typename T>
-WidgetView<T> &PropertyBasic<T>::operator[](ssize_t index) const
+WidgetView<T> &PropertyBasic<T>::operator[](int index) const
 {
     D_PTR(const PropertyBasic);
     assert(index >= 0);

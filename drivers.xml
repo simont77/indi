@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <driversList>
- 	<devGroup group="Spectrographs">
+    <devGroup group="Spectrographs">
         <device label="Shelyak Usis" manufacturer="Shelyak">
             <driver name="Shelyak Usis">shelyak_usis</driver>
             <version>1.2</version>
         </device>
-	</devGroup>
+    </devGroup>
     <devGroup group="Telescopes">
-		<device label="Shelyak Usis" manufacturer="Shelyak">
+        <device label="Shelyak Usis" manufacturer="Shelyak">
             <driver name="Shelyak Usis">shelyak_usis</driver>
+            <version>1.2</version>
+        </device>
+        <device label="LX200 10micron" manufacturer="10 Micron">
+            <driver name="LX200 10micron">indi_lx200_10micron</driver>
             <version>1.2</version>
         </device>
         <device label="LX200 Basic" manufacturer="Meade">
@@ -29,7 +33,11 @@
         </device>
         <device label="LX200 OnStep" manufacturer="OnStep">
             <driver name="LX200 OnStep">indi_lx200_OnStep</driver>
-            <version>1.19</version>
+            <version>1.22</version>
+        </device>
+        <device label="WARPDRIVE" manufacturer="WarpAstron">
+            <driver name="LX200 OnStep">indi_lx200_OnStep</driver>
+            <version>1.22</version>
         </device>
         <device label="LX200 OpenAstroTech" manufacturer="OpenAstroTech">
             <driver name="LX200 OpenAstroTech">indi_lx200_OpenAstroTech</driver>
@@ -37,7 +45,7 @@
         </device>
         <device label="LX200 TeenAstro" manufacturer="TeenAstro">
             <driver name="LX200 TeenAstro">indi_lx200_TeenAstro</driver>
-            <version>1.3</version>
+            <version>1.4</version>
         </device>
         <device label="LX200 16" manufacturer="Meade">
             <driver name="LX200 16">indi_lx200_16</driver>
@@ -63,61 +71,49 @@
             <driver name="EQ500X">indi_eq500x_telescope</driver>
             <version>1.0</version>
         </device>
-        <device label="AstroPhysics" manufacturer="Astrophysics">
-            <driver name="AstroPhysics">indi_lx200ap</driver>
-            <version>1.0</version>
-        </device>
         <device label="AstroPhysics V2" manufacturer="Astrophysics">
             <driver name="AstroPhysics V2">indi_lx200ap_v2</driver>
             <version>1.1</version>
-        </device>
-        <device label="NYX-101" manufacturer="Pegasus Astro">
-            <driver name="LX200 Autostar">indi_lx200autostar</driver>
-            <version>2.1</version>
         </device>
         <device label="Pegasus NYX-101" manufacturer="Pegasus Astro">
             <driver name="Pegasus NYX-101">indi_lx200_pegasus_nyx101</driver>
             <version>2.1</version>
         </device>
-        <device label="ZWO AM5" manufacturer="ZWO">
+        <device label="ZWO AM5 WiFi" manufacturer="ZWO">
             <driver name="ZWO AM5">indi_lx200am5</driver>
-            <version>1.0</version>
+            <version>1.1</version>
         </device>
-        <device label="AstroPhysics GTOCP2" manufacturer="Astrophysics">
-            <driver name="AstroPhysics GTOCP2">indi_lx200ap_gtocp2</driver>
-            <version>1.0</version>
-        </device>        
+        <device label="ZWO AM5 USB" manufacturer="ZWO">
+            <driver name="ZWO AM5">indi_lx200am5</driver>
+            <version>1.1</version>
+        </device>
         <device label="Celestron GPS" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
         </device>
-        <device label="Celestron CPC" manufacturer="Celestron">
+        <device label="Celestron CPC HC" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
         </device>
-        <device label="Celestron NexStar" manufacturer="Celestron">
+        <device label="Celestron NexStar HC" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
         </device>
-        <device label="Celestron AVX" manufacturer="Celestron">
+        <device label="Celestron Advanced VX HC" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
         </device>
-        <device label="Celestron CGEM" manufacturer="Celestron">
+        <device label="Celestron CGEM HC" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
         </device>
-        <device label="Celestron CGX" manufacturer="Celestron">
+        <device label="Celestron CGX HC" manufacturer="Celestron">
             <driver name="Celestron GPS">indi_celestron_gps</driver>
             <version>3.6</version>
         </device>
         <device label="Astro-Electronic FS-2" manufacturer="Astro-Electronic">
             <driver name="Astro-Electronic FS-2">indi_lx200fs2</driver>
-            <version>2.2</version>
-        </device>
-        <device label="Avalon Legacy" manufacturer="Avalon">
-            <driver name="LX200 Basic">indi_lx200basic</driver>
-            <version>2.1</version>
+            <version>2.3</version>
         </device>
         <device label="Paramount" manufacturer="Software Bisque">
             <driver name="Paramount">indi_paramount_telescope</driver>
@@ -129,11 +125,11 @@
         </device>
         <device label="Rainbow RST-135" manufacturer="Rainbow Astro">
             <driver name="Rainbow">indi_rainbow_telescope</driver>
-            <version>1.1</version>
+            <version>1.3</version>
         </device>
         <device label="Rainbow RST-300" manufacturer="Rainbow Astro">
             <driver name="Rainbow">indi_rainbow_telescope</driver>
-            <version>1.1</version>
+            <version>1.3</version>
         </device>
         <device label="CRUX TitanTCS" manufacturer="HOBYM">
             <driver name="CRUX TitanTCS">indi_crux_mount</driver>
@@ -183,33 +179,37 @@
             <driver name="iEQ">indi_ieq_telescope</driver>
             <version>1.9</version>
         </device>
+        <device label="iOptron iMate" manufacturer="iOptron">
+            <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
+            <version>1.7</version>
+        </device>
         <device label="iOptron CEM26" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron GEM28" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron HEM27" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron HAE29" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron SkyHunter" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron CEM40" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron GEM45" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron iEQ45 Pro" manufacturer="iOptron">
             <driver name="iEQ">indi_ieq_telescope</driver>
@@ -249,19 +249,19 @@
         </device>
         <device label="iOptron v3" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron CEM120" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron CEM70" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="iOptron AZ Pro" manufacturer="iOptron">
             <driver name="iOptronV3">indi_ioptronv3_telescope</driver>
-            <version>1.6</version>
+            <version>1.7</version>
         </device>
         <device label="Pulsar2" manufacturer="GTD">
             <driver name="Pulsar2">indi_lx200pulsar2</driver>
@@ -269,10 +269,6 @@
         </device>
         <device label="SkyCommander" manufacturer="DIY">
             <driver name="SkyCommander">indi_skycommander_telescope</driver>
-            <version>1.0</version>
-        </device>
-        <device label="LX200 10micron" manufacturer="10 Micron">
-            <driver name="LX200 10micron">indi_lx200_10micron</driver>
             <version>1.0</version>
         </device>
         <device label="Telescope Simulator" manufacturer="Simulator">
@@ -311,6 +307,10 @@
             <driver name="PMC8">indi_pmc8_telescope</driver>
             <version>0.5</version>
         </device>
+        <device label="Planewave" manufacturer="Planewave Instruments">
+            <driver name="Planewave">indi_planewave_telescope</driver>
+            <version>0.1</version>
+        </device>
     </devGroup>
     <devGroup group="Focusers">
         <device label="Focuser Simulator" manufacturer="Simulator">
@@ -319,6 +319,10 @@
         </device>
         <device label="RoboFocus" manufacturer="Robofocus">
             <driver name="RoboFocus">indi_robo_focus</driver>
+            <version>1.0</version>
+        </device>
+        <device label="iEAFFocus" manufacturer="iOptron">
+            <driver name="iEAFFocus">indi_ieaf_focus</driver>
             <version>1.0</version>
         </device>
         <device label="Shoestring Astronomy FCUSB" manufacturer="Shoestring">
@@ -405,7 +409,7 @@
             <driver name="Pegasus DMFC">indi_dmfc_focus</driver>
             <version>1.1</version>
         </device>
-	    <device label="Pegasus Prodigy MF" manufacturer="Pegasus Astro">
+        <device label="Pegasus Prodigy MF" manufacturer="Pegasus Astro">
             <driver name="Pegasus DMFC">indi_dmfc_focus</driver>
             <version>1.1</version>
         </device>
@@ -413,7 +417,11 @@
             <driver name="Pegasus FocusCube">indi_pegasus_focuscube</driver>
             <version>1.0</version>
         </device>
-         <device label="Pegasus ProdigyMF" manufacturer="Pegasus Astro">
+        <device label="Pegasus FocusCube3" manufacturer="Pegasus Astro">
+            <driver name="Pegasus FocusCube3">indi_pegasus_focuscube3</driver>
+            <version>1.0</version>
+        </device>
+        <device label="Pegasus ProdigyMF" manufacturer="Pegasus Astro">
             <driver name="Pegasus MMC-7000AH">indi_pegasus_prodigyMF</driver>
             <version>1.0</version>
         </device>
@@ -429,8 +437,24 @@
             <driver name="Pegasus Falcon">indi_falcon_rotator</driver>
             <version>1.0</version>
         </device>
+        <device label="Integra 85" manufacturer="Gemini Telescope">
+            <driver name="Integra85">indi_integra_focus</driver>
+            <version>1.1</version>
+        </device>
         <device label="Rotator Simulator" manufacturer="Simulator">
             <driver name="Rotator Simulator">indi_simulator_rotator</driver>
+            <version>1.0</version>
+        </device>
+        <device label="Rotator Lite" manufacturer="Wanderer Astro">
+            <driver name="Wanderer Rotator Lite">indi_wanderer_lite_rotator</driver>
+            <version>1.0</version>
+        </device>
+        <device label="Rotator Mini V1-2" manufacturer="Wanderer Astro">
+            <driver name="Wanderer Rotator Mini">indi_wanderer_rotator_mini</driver>
+            <version>1.1</version>
+        </device>
+        <device label="Rotator Lite V2" manufacturer="Wanderer Astro">
+            <driver name="Wanderer Rotator Lite V2">indi_wanderer_rotator_lite_v2</driver>
             <version>1.0</version>
         </device>
         <device label="Microtouch" manufacturer="Starizona">
@@ -491,7 +515,7 @@
         </device>
         <device label="Starlight EFS" manufacturer="Starlight Instruments">
             <driver name="SI EFS">indi_siefs_focus</driver>
-            <version>0.1</version>
+            <version>0.2</version>
         </device>
         <device label="Lacerta MFOC" manufacturer="Lacerta Optics">
             <driver name="Lacerta MFOC">indi_lacerta_mfoc_focus</driver>
@@ -501,8 +525,12 @@
             <driver name="Lacerta MFOC FMC">indi_lacerta_mfoc_fmc_focus</driver>
             <version>0.1</version>
         </device>
-	<device label="ActiveFocuser" manufacturer="Optique Unterlinden">
+        <device label="ActiveFocuser" manufacturer="Optique Unterlinden">
             <driver name="ActiveFocuser">indi_activefocuser_focus</driver>
+            <version>1.0</version>
+        </device>
+        <device label="Alluna TCS2" manufacturer="Alluna Optics">
+            <driver name="Alluna TCS2">indi_alluna_tcs2</driver>
             <version>1.0</version>
         </device>
     </devGroup>
@@ -617,6 +645,10 @@
             <driver name="Astrometry">indi_astrometry</driver>
             <version>0.1</version>
         </device>
+        <device label="AstroLink 4 mini II" manufacturer="Astrojolo">
+            <driver name="AstroLink 4 mini II">indi_astrolink4mini2</driver>
+            <version>0.2</version>
+        </device>
         <device label="SkySafari" manufacturer="Others">
             <driver name="SkySafari">indi_skysafari</driver>
             <version>0.2</version>
@@ -641,8 +673,12 @@
             <driver name="Pegasus UCH">indi_pegasus_uch</driver>
             <version>1.6</version>
         </device>
-         <device label="Pegasus FlatMaster" manufacturer="Pegasus Astro">
+        <device label="Pegasus FlatMaster" manufacturer="Pegasus Astro">
             <driver name="Pegasus FlatMaster">indi_pegasus_flatmaster</driver>
+            <version>1.2</version>
+        </device>
+        <device label="Pegasus Saddle Powerbox" manufacturer="Pegasus Astro">
+            <driver name="Pegasus SPB">indi_pegasus_spb</driver>
             <version>1.2</version>
         </device>
         <device label="PlaneWave Delta-T" manufacturer="Planewave Instruments">
@@ -651,7 +687,7 @@
         </device>
         <device label="WatchDog" manufacturer="Others">
             <driver name="WatchDog">indi_watchdog</driver>
-            <version>0.3</version>
+            <version>0.4</version>
         </device>
         <device label="Joystick" manufacturer="Others">
             <driver name="Joystick">indi_joystick</driver>
@@ -671,7 +707,7 @@
         </device>
         <device label="SnapCap" manufacturer="GTD">
             <driver name="SnapCap">indi_snapcap</driver>
-            <version>1.2</version>
+            <version>1.3</version>
         </device>
         <device label="RBF Excalibur" manufacturer="RB Focus">
             <driver name="RBF Excalibur">indi_Excalibur</driver>
@@ -713,26 +749,42 @@
             <driver name="myDewControllerPro">indi_myDewControllerPro</driver>
             <version>1.0</version>
         </device>
+        <device label="CheapoDC" manufacturer="DIY">
+            <driver name="CheapoDC">indi_cheapodc</driver>
+            <version>1.0</version>
+        </device>
         <device label="MyDCP4ESP32" manufacturer="DIY">
             <driver name="MyDCP4ESP32">indi_mydcp4esp32</driver>
             <version>1.0</version>
         </device>
-		<device label="DeepSkyDad FP1" manufacturer="DeepSkyDad">
+        <device label="DeepSkyDad FP1" manufacturer="DeepSkyDad">
             <driver name="DeepSkyDad FP1">indi_deepskydad_fp1</driver>
             <version>1.0</version>
         </device>
-		<device label="DeepSkyDad FR1" manufacturer="DeepSkyDad">
+        <device label="DeepSkyDad FR1" manufacturer="DeepSkyDad">
             <driver name="DeepSkyDad FR1">indi_deepskydad_fr1</driver>
             <version>1.0</version>
-        </device>
-        <device label="Wanderer Rotator Lite" manufacturer="Wanderer Astro">
-               <driver name="Wanderer Rotator Lite">indi_wanderer_lite_rotator</driver>
-               <version>1.0</version>
         </device>
         <device label="Wanderer Cover V3" manufacturer="Wanderer Astro">
             <driver name="Wanderer Cover V3">indi_wanderer_cover</driver>
             <version>1.0</version>
-        </device>        
+        </device>
+        <device label="WandererBox Pro V3" manufacturer="Wanderer Astro">
+            <driver name="WandererBox Pro V3">indi_wandererbox_pro_v3</driver>
+            <version>1.0</version>
+        </device>
+        <device label="WandererBox Plus V3" manufacturer="Wanderer Astro">
+            <driver name="WandererBox Plus V3">indi_wandererbox_plus_v3</driver>
+            <version>1.0</version>
+        </device>
+        <device label="WandererCover V4-EC" manufacturer="Wanderer Astro">
+            <driver name="WandererCover V4-EC">indi_wanderercover_v4_ec</driver>
+            <version>1.0</version>
+        </device>
+        <device label="DragonLIGHT" manufacturer="Dark Dragons Astro">
+            <driver name="DragonLIGHT">indi_dragon_light</driver>
+            <version>1.0</version>
+        </device>
     </devGroup>
     <devGroup group="Domes">
         <device label="ScopeDome Dome" manufacturer="ScopeDome">
@@ -769,6 +821,10 @@
         </device>
         <device label="NexDome Beaver" manufacturer="Lunatico">
             <driver name="NexDome Beaver">indi_nexdome_beaver</driver>
+            <version>1.0</version>
+        </device>
+        <device label="DragonLAIR" manufacturer="Dark Dragons Astro">
+            <driver name="DragonLAIR">indi_dragonlair_dome</driver>
             <version>1.0</version>
         </device>
     </devGroup>

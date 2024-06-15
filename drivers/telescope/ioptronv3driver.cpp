@@ -34,23 +34,53 @@ namespace IOPv3
 
 const std::map<std::string, std::string> Driver::models =
 {
-    {"0010", "Cube II EQ"},
-    {"0011", "SmartEQ Pro+"},
-    {"0025", "CEM25"},
+    {"0010", "SkyHunter EQ"},
+    {"0011", "SkyHunter AA"},
+    {"0015", "HEM15"},
+    {"0025", "HEM27"},
     {"0026", "CEM26"},
     {"0027", "CEM26-EC"},
     {"0028", "GEM28"},
     {"0029", "GEM28-EC"},
-    {"0030", "iEQ30 Pro"},
+    {"0030", "HEM27-EC"},
+    {"0031", "HAE29 EQ"},
+    {"0032", "HAE29-EC AA"},
+    {"0033", "HAE29 AA"},
+    {"0034", "HAE29-EC AA"},
+    {"0035", "HAZ31"},
+    {"0036", "HAE29C EQ"},
+    {"0037", "HAE29C-EC EQ"},
+    {"0038", "HAE29C AA"},
+    {"0039", "HAE29C-EC EQ"},
     {"0040", "CEM40"},
     {"0041", "CEM40-EC"},
     {"0043", "GEM45"},
-    {"0045", "iEQ45 Pro EQ"},
-    {"0046", "iEQ45 Pro AA"},
+    {"0045", "HEM44-EC"},
+    {"0046", "HEM44A"},
+    {"0047", "HEM44A-EC"},
+    {"0048", "HAE43 EQ"},
+    {"0049", "HAE43-EC EQ"},
+    {"0050", "HAE43 AA"},
+    {"0051", "HAE43-EC AA"},
+    {"0052", "HAZ46"},
+    {"0053", "HAE43C EQ"},
+    {"0054", "HAE43C-EC EQ"},
+    {"0055", "HAE43C AA"},
+    {"0056", "HAE43C-EC AA"},
     {"0060", "CEM60"},
     {"0061", "CEM60-EC"},
+    {"0062", "HAE69 EQ"},
+    {"0063", "HAZ69-EC EQ"},
+    {"0064", "HAE69 AA"},
+    {"0065", "HAE69-EC AA"},
+    {"0066", "HAE69C EQ"},
+    {"0067", "HAE69C-EC EQ"},
+    {"0068", "HAE69C AA"},
+    {"0069", "HAE69C-EC AA"},
     {"0070", "CEM70"},
     {"0071", "CEM70-EC"},
+    {"0072", "CEM70-EC2"},
+    {"0073", "HAZ71"},
     {"0120", "CEM120"},
     {"0121", "CEM120-EC"},
     {"0122", "CEM120-EC2"},
@@ -73,7 +103,12 @@ bool Driver::sendCommandOk(const char *command)
     return false;
 }
 
-bool Driver::sendCommand(const char *command, int count, char *response, uint8_t timeout, uint8_t debugLog)
+bool Driver::sendCommand(const char *command,
+                         int count,
+                         char *response,
+                         int minimumCount,
+                         uint8_t timeout,
+                         uint8_t debugLog)
 {
     int errCode = 0;
     int nbytes_read    = 0;
@@ -106,7 +141,7 @@ bool Driver::sendCommand(const char *command, int count, char *response, uint8_t
         else
             errCode = tty_read(PortFD, res, count, timeout, &nbytes_read);
 
-        if (errCode == TTY_OK)
+        if (errCode == TTY_OK && (minimumCount < 0 || minimumCount <= count))
             break;
     }
 
@@ -146,7 +181,7 @@ bool Driver::checkConnection(int fd)
 
     for (int i = 0; i < 2; i++)
     {
-        if (sendCommand(":MountInfo#", 4, res, 3) == false)
+        if (sendCommand(":MountInfo#", 4, res, -1, 3) == false)
         {
             usleep(50000);
             continue;
@@ -156,6 +191,7 @@ bool Driver::checkConnection(int fd)
     }
 
     return false;
+    DEBUGDEVICE(m_DeviceName, INDI::Logger::DBG_DEBUG, res);
 }
 
 void Driver::setDebug(bool enable)
@@ -250,7 +286,7 @@ bool Driver::getStatus(IOPInfo *info)
                  iopLongitude, iopLatitude, simData.simInfo.gpsStatus, simData.simInfo.systemStatus, simData.simInfo.trackRate,
                  simData.simInfo.slewRate, simData.simInfo.timeSource, simData.simInfo.hemisphere);
     }
-    else if (sendCommand(":GLS#", -1, res) == false)
+    else if (sendCommand(":GLS#", -1, res, 23) == false)
         return false;
 
 
@@ -712,7 +748,7 @@ bool Driver::getCoords(double *ra, double *de, IOP_PIER_STATE *pierState, IOP_CW
                  static_cast<uint32_t>(fabs(simData.de) * 60 * 60 * 100),
                  static_cast<uint32_t>(simData.ra * 15 * 60 * 60 * 100), simData.pier_state, simData.cw_state);
     }
-    else if (sendCommand(":GEP#", -1, res, IOP_TIMEOUT, INDI::Logger::DBG_EXTRA_1) == false)
+    else if (sendCommand(":GEP#", -1, res, 20, IOP_TIMEOUT, INDI::Logger::DBG_EXTRA_1) == false)
         return false;
 
     if (strlen(res) != 20)
@@ -753,7 +789,7 @@ bool Driver::getUTCDateTime(double *JD, int *utcOffsetMinutes, bool *dayLightSav
                  abs(simData.utc_offset_minutes),
                  (simData.day_light_saving ? '1' : '0'), static_cast<uint64_t>((simData.JD - J2000) * 8.64e+7));
     }
-    else if (sendCommand(":GUT#", -1, res) == false)
+    else if (sendCommand(":GUT#", -1, res, 18) == false)
         return false;
 
     if (strlen(res) != 18)

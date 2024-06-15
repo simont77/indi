@@ -46,6 +46,9 @@ class PropertyBasic : public INDI::Property
         ~PropertyBasic();
 
     public:
+        void setDeviceName(const char *name);
+        void setDeviceName(const std::string &name);
+
         void setName(const char *name);
         void setName(const std::string &name);
 
@@ -63,6 +66,7 @@ class PropertyBasic : public INDI::Property
         void setTimestamp(const std::string &timestamp);
 
     public:
+        const char *getDeviceName()         const;
         const char *getName()               const;
         const char *getLabel()              const;
         const char *getGroupName()          const;
@@ -86,6 +90,16 @@ class PropertyBasic : public INDI::Property
         bool isLabelMatch(const std::string &otherLabel) const;
 
     public:
+        /**
+         * @brief load Attempt to load property values from configuration file.
+         * @return True if value was read successfully from file, false otherwise.
+         */
+        bool load();
+
+        /**
+         * @brief save Save property to configuration file.
+         * @param f Pointer to existing open configuration file.
+         */
         void save(FILE *f) const;
 
         void vapply(const char *format, va_list args) const;
@@ -102,7 +116,10 @@ class PropertyBasic : public INDI::Property
 
     public:
         size_t size() const;
-        size_t count() const { return size(); }
+        size_t count() const
+        {
+            return size();
+        }
 
     public:
         void reserve(size_t size);
@@ -115,7 +132,7 @@ class PropertyBasic : public INDI::Property
 
         const WidgetView<T> *at(size_t index) const;
 
-        WidgetView<T> &operator[](ssize_t index) const;
+        WidgetView<T> &operator[](int index) const;
 
     public: // STL-style iterators
         WidgetView<T> *begin();

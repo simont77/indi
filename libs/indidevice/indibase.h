@@ -19,15 +19,16 @@
  *  and reduces code overhead.
  *
  *  <ul>
- *    <li>BaseClient: Base class for INDI clients. By subclassing BaseClient, client can easily connect to INDI server and handle device communication, command, and notifcation.</li>
+ *    <li>BaseClient: Base class for INDI clients. By subclassing BaseClient, client can easily connect to INDI server and handle device communication, command, and notification.</li>
  *    <li>BaseClientQt: Qt5 based class for INDI clients. By subclassing BaseClientQt, client can easily connect to INDI server
- *    and handle device communication, command, and notifcation.</li>
+ *    and handle device communication, command, and notification.</li>
  *    <li>BaseMediator: Abstract class to provide interface for event notifications in INDI::BaseClient.</li>
  *    <li>BaseDevice: Base class for all INDI virtual devices as handled and stored in INDI::BaseClient. It is also the parent for all drivers.</li>
  *    <li>DefaultDevice: INDI::BaseDevice with extended functionality such as debug, simulation, and configuration support.
  *        It is the base class for all drivers and may \e only used by drivers directly, it cannot be used by clients.</li>
  *    <li>FilterInterface: Basic interface for filter wheels functions.</li>
  *    <li>GuiderInterface: Basic interface for guider (ST4) port functions.</li>
+ *    <li>GPSInterface: Basic interface for GPS functions.</li>
  *    <li>RotatorInterface: Basic interface for Rotator functions.</li>
  *    <li>DustCapInterface: Basic interface remotely controlled dust covers.</li>
  *    <li>LightBoxInterface: Basic interface for remotely controlled light boxes/switches.</li>
@@ -57,6 +58,7 @@ class DefaultDevice;
 class FilterInterface;
 class RotatorInterface;
 class GuiderInterface;
+class GPSInterface;
 class FocuserInterface;
 class WeatherInterface;
 class SensorInterface;
@@ -100,7 +102,7 @@ class INDI::BaseMediator
         /** @brief Emmited when a device is deleted from INDI server.
          *  @param baseDevice BaseDevice instance.
          */
-        virtual void removeDevice(INDI::BaseDevice baseDevice);        
+        virtual void removeDevice(INDI::BaseDevice baseDevice);
 
     public:
         /** @brief Emmited when a new property is created for an INDI driver.

@@ -106,12 +106,13 @@ class Telescope : public DefaultDevice
         };
         enum TelescopeParkData
         {
-            PARK_NONE,
-            PARK_RA_DEC,
-            PARK_HA_DEC,
-            PARK_AZ_ALT,
-            PARK_RA_DEC_ENCODER,
-            PARK_AZ_ALT_ENCODER
+            PARK_NONE,              /*!< Mount does not support any form of parking */
+            PARK_RA_DEC,            /*!< Park to specific RA/DE coordinate. Deprecated, do not use */
+            PARK_HA_DEC,            /*!< Park to specific HA/DE coordinate. Hour Angle & Declination degrees */
+            PARK_AZ_ALT,            /*!< Park to specific AZ/ALT coordinate. Azimuth & Altitude degrees */
+            PARK_RA_DEC_ENCODER,    /*!< Park to specific HA/DE encoder. Hour Angle & Declination steps */
+            PARK_AZ_ALT_ENCODER,    /*!< Park to specific AZ/ALT encoder. Azimuth & Altitude steps */
+            PARK_SIMPLE             /*!< Only Park or Unpark is known but location is unknown. */
         };
         enum TelescopeLocation
         {
@@ -368,7 +369,7 @@ class Telescope : public DefaultDevice
         double GetAxis2Park() const;
 
         /**
-         * @return Get defailt DEC/ALT parking position.
+         * @return Get default DEC/ALT parking position.
          */
         double GetAxis2ParkDefault() const;
 
@@ -452,7 +453,7 @@ class Telescope : public DefaultDevice
          *   <li>Update telescope status: Idle, Slewing, Parking..etc.</li>
          *   <li>Read coordinates</li>
          * </ol>
-         * \return True if reading scope status is OK, false if an error is encounterd.
+         * \return True if reading scope status is OK, false if an error is encountered.
          * \note This function is not implemented in Telescope, it must be implemented in the
          * child class
          */
@@ -666,23 +667,6 @@ class Telescope : public DefaultDevice
         IGeographicCoordinates m_Location { 0, 0, 0 };
 
         /**
-         * @brief Load scope settings from XML files.
-         * @return True if all config values were loaded otherwise false.
-         */
-        bool LoadScopeConfig();
-
-        /**
-         * @brief Load scope settings from XML files.
-         * @return True if Config #1 exists otherwise false.
-         */
-        bool HasDefaultScopeConfig();
-
-        /**
-         * \brief Save scope settings to XML files.
-         */
-        bool UpdateScopeConfig();
-
-        /**
          * @brief Validate a file name
          * @param file_name File name
          * @return True if the file name is valid otherwise false.
@@ -715,6 +699,11 @@ class Telescope : public DefaultDevice
          */
         TelescopeStatus RememberTrackState {SCOPE_IDLE};
 
+        /**
+        * \defgroup INDI Mount Standard Properties
+        * @{
+        */
+
         // All telescopes should produce equatorial co-ordinates
         INumberVectorProperty EqNP;
         INumber EqN[2];
@@ -732,7 +721,7 @@ class Telescope : public DefaultDevice
         ISwitchVectorProperty CoordSP;
         ISwitch CoordS[4];
 
-        // A number vector that stores lattitude and longitude
+        // A number vector that stores latitude and longitude
         INumberVectorProperty LocationNP;
         INumber LocationN[3];
 
@@ -744,9 +733,18 @@ class Telescope : public DefaultDevice
         INumber ParkPositionN[2];
         INumberVectorProperty ParkPositionNP;
 
-        // Custom parking options
-        ISwitch ParkOptionS[4];
-        ISwitchVectorProperty ParkOptionSP;
+        /**
+        + NAME: TELESCOPE_PARK_POSITION
+        + DESCRIPTION: Mount parking position option. Set mount parking position from current or default positions and write or purge data from the standard ParkData.xml file.
+          ParkData.xml contains all the parking positions for all INDI devices and is read on startup. It indicates the parking position and status (Parked/Unparked)
+        + TYPE: SWITCH
+        + MEMBMERS:
+            + PARK_CURRENT: Use current mount position as the parking position
+            + PARK_DEFAULT: Use driver own default position (defined by driver) as the parking position
+            + PARK_WRITE_DATA: Write current parking information to ParkData.xml file.
+            + PARK_PURGE_DATA: Remove Park data from ParkData.xml file.
+        **/
+        INDI::PropertySwitch ParkOptionSP {4};
         enum
         {
             PARK_CURRENT,
@@ -775,24 +773,24 @@ class Telescope : public DefaultDevice
         ISwitchVectorProperty SlewRateSP;
         ISwitch *SlewRateS {nullptr};
 
-        // Telescope & guider aperture and focal length
-        INumber ScopeParametersN[4];
-        INumberVectorProperty ScopeParametersNP;
-
         // UTC and UTC Offset
         IText TimeT[2] {};
         ITextVectorProperty TimeTP;
         void sendTimeFromSystem();
 
         // Active GPS/Dome device to snoop
-        ITextVectorProperty ActiveDeviceTP;
-        IText ActiveDeviceT[2] {};
+        INDI::PropertyText ActiveDeviceTP {2};
+        enum
+        {
+            ACTIVE_GPS,
+            ACTIVE_DOME
+        };
 
         // Switch to lock if dome is closed.
         ISwitchVectorProperty DomePolicySP;
         ISwitch DomePolicyS[2];
 
-        // Switch for choosing between motion control by 4-way joystick or two seperate axes
+        // Switch for choosing between motion control by 4-way joystick or two separate axes
         ISwitchVectorProperty MotionControlModeTP;
         ISwitch MotionControlModeT[2];
         enum
@@ -801,7 +799,7 @@ class Telescope : public DefaultDevice
             MOTION_CONTROL_AXES
         };
 
-        // Lock Joystick Axis to one direciton only
+        // Lock Joystick Axis to one direction only
         ISwitch LockAxisS[2];
         ISwitchVectorProperty LockAxisSP;
 
@@ -876,6 +874,8 @@ class Telescope : public DefaultDevice
         INumberVectorProperty TrackRateNP;
         INumber TrackRateN[2];
 
+        /**@}*/
+
         // PEC State
         TelescopePECState lastPECState {PEC_UNKNOWN}, currentPECState {PEC_UNKNOWN};
 
@@ -890,36 +890,6 @@ class Telescope : public DefaultDevice
         int PortFD                           = -1;
         Connection::Serial *serialConnection = nullptr;
         Connection::TCP *tcpConnection       = nullptr;
-
-        // XML node names for scope config
-        const std::string ScopeConfigRootXmlNode { "scopeconfig" };
-        const std::string ScopeConfigDeviceXmlNode { "device" };
-        const std::string ScopeConfigNameXmlNode { "name" };
-        const std::string ScopeConfigScopeFocXmlNode { "scopefoc" };
-        const std::string ScopeConfigScopeApXmlNode { "scopeap" };
-        const std::string ScopeConfigGScopeFocXmlNode { "gscopefoc" };
-        const std::string ScopeConfigGScopeApXmlNode { "gscopeap" };
-        const std::string ScopeConfigLabelApXmlNode { "label" };
-
-        // A switch to apply custom aperture/focal length config
-        enum
-        {
-            SCOPE_CONFIG1,
-            SCOPE_CONFIG2,
-            SCOPE_CONFIG3,
-            SCOPE_CONFIG4,
-            SCOPE_CONFIG5,
-            SCOPE_CONFIG6
-        };
-        ISwitch ScopeConfigs[6];
-        ISwitchVectorProperty ScopeConfigsSP;
-
-        // Scope config name
-        ITextVectorProperty ScopeConfigNameTP;
-        IText ScopeConfigNameT[1] {};
-
-        /// The telescope/guide scope configuration file name
-        const std::string ScopeConfigFileName;
 
         bool IsParked {false};
         TelescopeParkData parkDataType {PARK_NONE};

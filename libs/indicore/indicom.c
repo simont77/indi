@@ -50,7 +50,7 @@
 #include <string.h>
 #include <time.h>
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__NetBSD__)
 #include <sys/ioctl.h>
 #endif
 
@@ -95,7 +95,7 @@
 #if defined(_MSC_VER)
 #define snprintf _snprintf
 #pragma warning(push)
-///@todo Introduce plattform indipendent safe functions as macros to fix this
+///@todo Introduce platform independent safe functions as macros to fix this
 #pragma warning(disable : 4996)
 #endif
 
@@ -793,7 +793,7 @@ int tty_connect(const char *device, int bit_rate, int word_size, int parity, int
     case 57600:  bps = B57600;  break;
     case 115200: bps = B115200; break;
     case 230400: bps = B230400; break;
-#if !defined(__APPLE__) && !defined(__FreeBSD__)
+#if !defined(__APPLE__) && !defined(__FreeBSD__) && !defined(__NetBSD__)
     case 460800: bps = B460800; break;
     case 576000: bps = B576000; break;
     case 921600: bps = B921600; break;

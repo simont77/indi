@@ -41,16 +41,19 @@ list(APPEND ${PROJECT_NAME}_SOURCES
     indidevapi.c
     lilxml.cpp
     indiuserio.c
+    sharedblob.c
 )
 
 if(UNIX)
     list(APPEND ${PROJECT_NAME}_PRIVATE_HEADERS
         sharedblob_parse.h
         shm_open_anon.h)
-    list(APPEND ${PROJECT_NAME}_SOURCES
-        sharedblob.c
+    list(APPEND ${PROJECT_NAME}_SOURCES        
         sharedblob_parse.cpp
         shm_open_anon.c)
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(${PROJECT_NAME} rt)
+    endif()
 endif()
 
 target_compile_definitions(${PROJECT_NAME}

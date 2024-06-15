@@ -35,7 +35,6 @@
 #define SLEWRATE 1          /* slew rate, degrees/s */
 
 #define MOUNTINFO_TAB "Mount Info"
-#define PEC_TAB "PEC training"  
 
 using namespace iEQ;
 
@@ -51,9 +50,6 @@ IEQPro::IEQPro()
     scopeInfo.gpsStatus    = GPS_OFF;
     scopeInfo.systemStatus = ST_STOPPED;
     scopeInfo.trackRate    = TR_SIDEREAL;
-    /* v3.0 use default PEC Settings */
-    scopeInfo.systemStatus = ST_TRACKING_PEC_OFF;
-    // End Mod */
     scopeInfo.slewRate     = SR_1;
     scopeInfo.timeSource   = TS_RS232;
     scopeInfo.hemisphere   = HEMI_NORTH;
@@ -61,9 +57,6 @@ IEQPro::IEQPro()
     DBG_SCOPE = INDI::Logger::getInstance().addDebugLevel("Scope Verbose", "SCOPE");
 
     SetTelescopeCapability(TELESCOPE_CAN_PARK | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT |
-                            /* v3.0 use default PEC Settings */
-                           TELESCOPE_HAS_PEC  |
-                           // End Mod */
                            TELESCOPE_HAS_TIME | TELESCOPE_HAS_LOCATION | TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK |
                            TELESCOPE_HAS_TRACK_RATE,
                            9);
@@ -141,26 +134,6 @@ bool IEQPro::initProperties()
     IUFillSwitchVector(&HomeSP, HomeS, 3, getDeviceName(), "HOME", "Home", MAIN_CONTROL_TAB, IP_RW, ISR_ATMOST1, 0,
                        IPS_IDLE);
 
-    /* PEC */
-    IUFillSwitch(&PECTrainingS[0], "PEC_Recording", "Record", ISS_OFF);
-    IUFillSwitch(&PECTrainingS[1], "PEC_Status", "Status", ISS_OFF);
-    IUFillSwitchVector(&PECTrainingSP, PECTrainingS, 2, getDeviceName(), "PEC_TRAINING", "PEC Training", PEC_TAB, IP_RW,
-                       ISR_1OFMANY, 0,
-                       IPS_IDLE);
-    IUFillText(&PECInfoT[0], "PEC_INFO", "Status", "");
-    IUFillTextVector(&PECInfoTP, PECInfoT, 1, getDeviceName(), "PEC_INFOS", "PEC Status", PEC_TAB,
-                     IP_RO, 60, IPS_IDLE);
-    IUFillText(&PECFileT[0], "PEC_FILE_PATH", "Path", getenv("HOME"));
-    IUFillText(&PECFileT[1], "PEC_FILE_NAME", "Name", "pec.txt");
-    IUFillText(&PECFileT[2], "PEC_FILE_TIME", "Time(YYYY-MM-DD hh:mm:ss)", "");
-    IUFillTextVector(&PECFileTP, PECFileT, 3, getDeviceName(), "PEC_FILE", "PEC file", PEC_TAB,
-                     IP_RW, 60, IPS_IDLE);
-    IUFillNumber(&PECTimingN[0], "PEC_PERIOD", "Period (s)", "%g", 0, 1000, 1, 400);
-    IUFillNumber(&PECTimingN[1], "PEC_DEPHASE", "Dephase (s)", "%g", 0, 1000, 1, 0);
-    IUFillNumber(&PECTimingN[2], "PEC_MINSTEP", "Minimum pulse (ms)", "%g", 0, 1000, 1, 10);
-    IUFillNumberVector(&PECTimingNP, PECTimingN, 3, getDeviceName(), "PEC_TIMING", "PEC Timing", PEC_TAB, IP_RW, 0,
-                       IPS_IDLE);
-
     /* How fast do we guide compared to sidereal rate */
     IUFillNumber(&GuideRateN[RA_AXIS], "RA_GUIDE_RATE", "RA", "%.2f", 0.01, 0.9, 0.1, 0.5);
     IUFillNumber(&GuideRateN[DEC_AXIS], "DE_GUIDE_RATE", "DE", "%.2f", 0.1, 0.99, 0.1, 0.5);
@@ -202,11 +175,6 @@ bool IEQPro::updateProperties()
             HomeSP.nsp = 2;
 
         defineProperty(&HomeSP);
-        
-        defineProperty(&PECTrainingSP);
-        defineProperty(&PECInfoTP);
-        defineProperty(&PECFileTP);
-        defineProperty(&PECTimingNP);
 
         defineProperty(&GuideNSNP);
         defineProperty(&GuideWENP);
@@ -225,11 +193,6 @@ bool IEQPro::updateProperties()
 
         HomeSP.nsp = 3;
         deleteProperty(HomeSP.name);
-
-        deleteProperty(PECTrainingSP.name);
-        deleteProperty(PECInfoTP.name);
-        deleteProperty(PECFileTP.name);
-        deleteProperty(PECTimingNP.name);
 
         deleteProperty(GuideNSNP.name);
         deleteProperty(GuideWENP.name);
@@ -346,99 +309,13 @@ void IEQPro::getStartupData()
         SetTelescopeCapability(cap, 9);
     }
 
-   /* v3.0 Read PEC State at startup */
-    iEQ::Base::Info newInfo;
-    if (driver->getStatus(&newInfo))
-    {
-        switch (newInfo.systemStatus)
-        {
-            case ST_STOPPED:
-            case ST_PARKED:
-            case ST_HOME:
-            case ST_SLEWING:
-            case ST_MERIDIAN_FLIPPING:
-            case ST_GUIDING:
-
-            case ST_TRACKING_PEC_OFF:
-                setPECState(PEC_OFF);
-                break;
-
-            case ST_TRACKING_PEC_ON:
-                setPECState(PEC_ON);
-                break;
-        }
-        scopeInfo = newInfo;
-    }
-    // End Mod */
-
-    if (isSimulation())
-    {
-        if (isParked())
-            driver->setSimSytemStatus(ST_PARKED);
-        else
-            driver->setSimSytemStatus(ST_STOPPED);
-    }
-}
-
-bool IEQPro::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
-{
-    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
-    {
-        // PEC file
-        if (!strcmp(name, PECFileTP.name))
-        {
-            snprintf(PECFullPath,256,"%s/%s",texts[0],texts[1]);
-            
-
-            int day, month, year, hour, min, sec;
-            sscanf(texts[2],"%4d-%2d-%2d %2d:%2d:%2d",&year,&month,&day,&hour,&min,&sec);
-            PECStart_tm.tm_year = year - 1900;
-            PECStart_tm.tm_mon = month - 1;
-            PECStart_tm.tm_mday = day;
-            PECStart_tm.tm_hour = hour;
-            PECStart_tm.tm_min = min;
-            PECStart_tm.tm_sec = sec;
-            PECStart_tm.tm_isdst = -1;
-            PECStartTime = mktime(&PECStart_tm);
-
-            char temp_string[64];
-            snprintf(temp_string,64,"PEC file path: %s",PECFullPath);
-            LOG_INFO(temp_string);
-            
-            snprintf(temp_string,64,"Acquisition time: %s",asctime(&PECStart_tm));
-            LOG_INFO(temp_string);
-
-
-            if ((int)(PECTimingN[1].value) !=0)
-            {
-                PECStart_tm.tm_sec += PECTimingN[1].value;
-                PECStartTime = mktime(&PECStart_tm);
-                snprintf(temp_string,64,"Acquisition time dephased: %s",asctime(&PECStart_tm));
-                LOG_INFO(temp_string);           
-            }
-
-            time_t actual_time;
-            time(&actual_time);
-            snprintf(temp_string,64,"Actual time: %s",ctime(&actual_time));
-            LOG_INFO(temp_string);     
-
-            int nextPeriodDelta;
-            nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
-                                        difftime(actual_time, PECStartTime));
-            snprintf(temp_string,50,"Time to next period start: %ds",nextPeriodDelta);
-            LOG_INFO(temp_string);
-
-            snprintf(texts[2],MAXINDILABEL,"%s",asctime(&PECStart_tm));
-            
-            IUUpdateText(&PECFileTP, texts, names, n);
-            PECFileTP.s = IPS_OK;
-            IDSetText(&PECFileTP, nullptr);
-
-            return true;
-        }
-    }
-
-    return INDI::Telescope::ISNewText(dev, name, texts, names, n);
+    //    if (isSimulation())
+    //    {
+    //        if (isParked())
+    //            set_sim_system_status(ST_PARKED);
+    //        else
+    //            set_sim_system_status(ST_STOPPED);
+    //    }
 }
 
 bool IEQPro::ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n)
@@ -457,15 +334,6 @@ bool IEQPro::ISNewNumber(const char *dev, const char *name, double values[], cha
 
             IDSetNumber(&GuideRateNP, nullptr);
 
-            return true;
-        }
-
-        // PEC
-        if (!strcmp(name, PECTimingNP.name))
-        {
-            IUUpdateNumber(&PECTimingNP, values, names, n);
-            PECTimingNP.s = IPS_OK;
-            IDSetNumber(&PECTimingNP, nullptr);
             return true;
         }
 
@@ -541,125 +409,6 @@ bool IEQPro::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
 
             return true;
         }
-    
-
-        /*******************************************************
-         * PEC Operations
-        *******************************************************/
-        
-        if (!strcmp(name, PECStateSP.name))
-        {
-            IUUpdateSwitch(&PECStateSP, states, names, n);
-
-            if(IUFindOnSwitchIndex(&PECStateSP) == 0)
-            {
-                // PEC OFF
-                if(isTraining)
-                {
-                    // Training check
-                    sprintf(PECText, "Mount PEC busy recording index %d", PECIndex);
-                    LOG_WARN(PECText);
-                }
-                else
-                {
-                    driver->setPECEnabled(false);
-                    PECStateSP.s = IPS_OK;
-                    LOG_INFO("Disabling PEC Chip");
-                }
-            }
-
-            if(IUFindOnSwitchIndex(&PECStateSP) == 1)
-            {   
-                driver->setPECEnabled(true);
-                PECStateSP.s = IPS_BUSY;
-                LOG_INFO("Enabling PEC Chip");
-            }
-            
-            IDSetSwitch(&PECStateSP, nullptr);
-            return true;
-        }
-
-        /*******************************************************
-         * PEC Training
-        *******************************************************/
-        if (!strcmp(name, PECTrainingSP.name))
-        {
-            IUUpdateSwitch(&PECTrainingSP, states, names, n);
-            if (isTraining || isWaitingTraining)
-            {
-                // Check if already training
-                if(IUFindOnSwitchIndex(&PECTrainingSP) == 1)
-                {
-                    // Train Check Status
-                    sprintf(PECText, "Mount PEC busy recording index %d", PECIndex);
-                    LOG_WARN(PECText);
-                }
-
-                if(IUFindOnSwitchIndex(&PECTrainingSP) == 0)
-                {
-                    // Train Cancel
-                    driver->setPETEnabled(false);
-                    delete[] PECvalues;
-                    isTraining = false;
-                    isWaitingTraining = false;
-                    PECTrainingSP.s = IPS_ALERT;
-                    LOG_WARN("PEC Training cancelled by user, chip disabled");
-                }
-            }
-            else
-            {
-                if(IUFindOnSwitchIndex(&PECTrainingSP) == 0)
-                {
-                    if(TrackState == SCOPE_TRACKING)
-                    {
-                        // Train if tracking /guiding
-                        PECfile.open(PECFullPath);
-                        std::string str; 
-
-                        std::getline(PECfile, str);                   
-                        std::getline(PECfile, str);                      
-                        std::getline(PECfile, str);                      
-                        std::getline(PECfile, str);                      
-                        std::getline(PECfile, str);
-                        
-                        PECvalues = new float[(int)PECTimingN[0].value];
-
-                        for (int i=0; i<PECTimingN[0].value; i++)
-                        {
-                            std::getline(PECfile, str);
-                            PECvalues[i] = std::stof(str.substr(str.find_last_of(" ")));
-                            LOG_INFO(std::to_string(PECvalues[i]).c_str());
-                        }
-                        
-                        PECfile.close();
-
-                        isWaitingTraining = true;
-                        
-                        PECTrainingSP.s = IPS_BUSY;
-                        int nextPeriodDelta;
-                        char temp_string[64];
-                        time_t actual_time;
-                        time(&actual_time);
-                        nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
-                                            difftime(actual_time, PECStartTime));
-                        snprintf(temp_string,50,"PEC recording started, time to next period: %ds",nextPeriodDelta);
-                        LOG_INFO(temp_string);                      
-                    }
-                    else
-                    {
-                        LOG_WARN("PEC Training only possible while guiding");
-                        PECTrainingSP.s = IPS_IDLE;
-                    }
-                }
-                if(IUFindOnSwitchIndex(&PECTrainingSP) == 1)
-                {
-                    // Train Status
-                    LOG_WARN("PEC Data status not supported");
-                }
-            }
-            IDSetSwitch(&PECTrainingSP, nullptr);
-            return true;
-        }
     }
 
     return INDI::Telescope::ISNewSwitch(dev, name, states, names, n);
@@ -669,8 +418,8 @@ bool IEQPro::ReadScopeStatus()
 {
     iEQ::Base::Info newInfo;
 
-    if (isSimulation())
-        mountSim();
+    //    if (isSimulation())
+    //        mountSim();
 
     bool rc = driver->getStatus(&newInfo);
 
@@ -737,12 +486,9 @@ bool IEQPro::ReadScopeStatus()
                 if (TrackState != SCOPE_SLEWING && TrackState != SCOPE_PARKING)
                     TrackState = SCOPE_SLEWING;
                 break;
-            /* v3.0 PEC update status */
             case ST_TRACKING_PEC_OFF:
             case ST_TRACKING_PEC_ON:
             case ST_GUIDING:
-                if (newInfo.systemStatus == ST_TRACKING_PEC_OFF || newInfo.systemStatus == ST_TRACKING_PEC_ON)
-                    setPECState(newInfo.systemStatus == ST_TRACKING_PEC_ON ? PEC_ON : PEC_OFF);
                 if (TrackState == SCOPE_PARKING && canParkNatively == false)
                 {
                     if (slewDirty)
@@ -773,126 +519,6 @@ bool IEQPro::ReadScopeStatus()
 
         scopeInfo = newInfo;
     }
-
-    /* v3.0 Monitor PEC Training */
-    if (isTraining)
-    {
-        if (TrackState == SCOPE_TRACKING)
-        {
-            if(elapsed_training > (int)(PECTimingN[0].value) + 10)
-            {
-                sprintf(PECText, "PEC with %d second worm cycle recorded", (int)(PECTimingN[0].value));
-                LOG_INFO(PECText);
-                IUSaveText(&PECInfoT[0], PECText);
-                delete[] PECvalues;
-                PECTrainingSP.s = IPS_OK;
-                isTraining = false;
-            }
-            else
-            {
-                char temp_str[128];
-                time_t actual_time;
-  
-                time(&actual_time);
-                int nextPeriodDelta;
-                nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
-                                        difftime(actual_time, PECStartTime));
-
-                PECIndex = PECTimingN[0].value-nextPeriodDelta + PECTimingN[1].value;
-
-                if (PECIndex>=PECTimingN[0].value)
-                    PECIndex = PECIndex - PECTimingN[0].value;
-
-                float deltaPE;
-                int guidePulse;
-
-                deltaPE= PECvalues[PECIndex]-appliedCorrection;
-                guidePulse = (int)floor((deltaPE/(TRACKRATE_SIDEREAL*GuideRateN[0].value))*1000 + 0.5);   //round to ms
-                if (guidePulse > (PECTimingN[2].value) || guidePulse<-(PECTimingN[2].value))
-                {
-                    //apply guiding here
-                    if (guidePulse > 0)
-                        GuideWest((int)(guidePulse));
-                    else
-                        GuideEast((int)(-guidePulse));
-
-                    appliedCorrection += (guidePulse/1000.0) * (TRACKRATE_SIDEREAL*GuideRateN[0].value);
-                }
-                else
-                {
-                    guidePulse = 0;
-                }
-
-                elapsed_training = elapsed_training + getCurrentPollingPeriod()/1000;
-
-                sprintf(temp_str, "Index: %d, delta: %.4f, pulse: %d, total corr: %.4f, error: %.4f",
-                             PECIndex, deltaPE, guidePulse, appliedCorrection, PECvalues[PECIndex]-appliedCorrection);
-                LOG_INFO(temp_str);
-
-                sprintf(PECText, "Recording index %d", PECIndex);
-                IUSaveText(&PECInfoT[0], PECText);
-            }
-        }
-        else
-        {
-            driver->setPETEnabled(false);
-            PECTrainingSP.s = IPS_ALERT;
-            sprintf(PECText, "Tracking error, recording cancelled at index %d", PECIndex);
-            delete[] PECvalues;
-            LOG_ERROR(PECText);
-            IUSaveText(&PECInfoT[0], "Cancelled");
-        }
-        IDSetText(&PECInfoTP, nullptr);
-        IDSetSwitch(&PECTrainingSP, nullptr);
-    }
-    
-    if (isWaitingTraining)
-    {
-        if (TrackState == SCOPE_TRACKING)
-        {
-            time_t actual_time;
-  
-            time(&actual_time);
-            
-
-            int nextPeriodDelta;
-            nextPeriodDelta=(int)((floor(difftime(actual_time, PECStartTime)/PECTimingN[0].value)+1)*PECTimingN[0].value-
-                                        difftime(actual_time, PECStartTime));
-
-            if (nextPeriodDelta == PECTimingN[0].value)
-            {
-                driver->setPETEnabled(true);
-                isWaitingTraining = false;
-                isTraining = true;
-                elapsed_training = 0;
-                LOG_INFO("Recording started.");
-                PECIndex = PECTimingN[1].value;;
-                appliedCorrection = 0;
-                sprintf(PECText, "Recording index %d", PECIndex);
-                IUSaveText(&PECInfoT[0], PECText);
-            }
-            else
-            {
-                sprintf(PECText, "Time to start recording: %d s", nextPeriodDelta);
-                IUSaveText(&PECInfoT[0], PECText);
-            }
-            
-        }
-        else
-        {
-            driver->setPETEnabled(false);
-            PECTrainingSP.s = IPS_ALERT;
-            sprintf(PECText, "Tracking error, recording cancelled at index %d", PECIndex);
-            delete[] PECvalues;
-            isWaitingTraining = false;
-            isTraining = false;
-            LOG_ERROR(PECText);
-            IUSaveText(&PECInfoT[0], "Cancelled");
-        }
-        IDSetText(&PECInfoTP, nullptr);
-        IDSetSwitch(&PECTrainingSP, nullptr);
-    }
-    // End Mod */
 
     if (HasPierSide())
     {
@@ -1088,7 +714,15 @@ bool IEQPro::UnPark()
 
 bool IEQPro::Handshake()
 {
-    driver->setSimulation(isSimulation());
+    //    if (isSimulation())
+    //    {
+    //        set_sim_gps_status(GPS_DATA_OK);
+    //        set_sim_system_status(ST_STOPPED);
+    //        set_sim_track_rate(TR_SIDEREAL);
+    //        set_sim_slew_rate(SR_3);
+    //        set_sim_time_source(TS_GPS);
+    //        set_sim_hemisphere(HEMI_NORTH);
+    //    }
 
     if (driver->initCommunication(PortFD) == false)
         return false;
@@ -1170,7 +804,8 @@ void IEQPro::debugTriggered(bool enable)
 
 void IEQPro::simulationTriggered(bool enable)
 {
-    driver->setSimulation(enable);
+    INDI_UNUSED(enable);
+    //driver->setSi(enable);
 }
 
 bool IEQPro::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
@@ -1278,93 +913,93 @@ bool IEQPro::saveConfigItems(FILE *fp)
     return true;
 }
 
-void IEQPro::mountSim()
-{
-   static struct timeval ltv;
-   struct timeval tv;
-   double dt, da, dx;
-   int nlocked;
+//void IEQPro::mountSim()
+//{
+//    static struct timeval ltv;
+//    struct timeval tv;
+//    double dt, da, dx;
+//    int nlocked;
 
-   /* update elapsed time since last poll, don't presume exactly POLLMS */
-   gettimeofday(&tv, nullptr);
+//    /* update elapsed time since last poll, don't presume exactly POLLMS */
+//    gettimeofday(&tv, nullptr);
 
-   if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
-       ltv = tv;
+//    if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
+//        ltv = tv;
 
-   dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
-   ltv = tv;
-   da  = SLEWRATE * dt;
+//    dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
+//    ltv = tv;
+//    da  = SLEWRATE * dt;
 
-   /* Process per current state. We check the state of EQUATORIAL_COORDS and act acoordingly */
-   switch (TrackState)
-   {
-       case SCOPE_IDLE:
-           currentRA += (TrackRateN[AXIS_RA].value / 3600.0 * dt) / 15.0;
-           currentRA = range24(currentRA);
-           break;
+//    /* Process per current state. We check the state of EQUATORIAL_COORDS and act accordingly */
+//    switch (TrackState)
+//    {
+//        case SCOPE_IDLE:
+//            currentRA += (TrackRateN[AXIS_RA].value / 3600.0 * dt) / 15.0;
+//            currentRA = range24(currentRA);
+//            break;
 
-       case SCOPE_TRACKING:
-           if (TrackModeS[1].s == ISS_ON)
-           {
-               currentRA  += ( ((TRACKRATE_SIDEREAL / 3600.0) - (TrackRateN[AXIS_RA].value / 3600.0)) * dt) / 15.0;
-               currentDEC += ( (TrackRateN[AXIS_DE].value / 3600.0) * dt);
-           }
-           break;
+//        case SCOPE_TRACKING:
+//            if (TrackModeS[1].s == ISS_ON)
+//            {
+//                currentRA  += ( ((TRACKRATE_SIDEREAL / 3600.0) - (TrackRateN[AXIS_RA].value / 3600.0)) * dt) / 15.0;
+//                currentDEC += ( (TrackRateN[AXIS_DE].value / 3600.0) * dt);
+//            }
+//            break;
 
-       case SCOPE_SLEWING:
-       case SCOPE_PARKING:
-           /* slewing - nail it when both within one pulse @ SLEWRATE */
-           nlocked = 0;
+//        case SCOPE_SLEWING:
+//        case SCOPE_PARKING:
+//            /* slewing - nail it when both within one pulse @ SLEWRATE */
+//            nlocked = 0;
 
-           dx = targetRA - currentRA;
+//            dx = targetRA - currentRA;
 
-           // Take shortest path
-           if (fabs(dx) > 12)
-               dx *= -1;
+//            // Take shortest path
+//            if (fabs(dx) > 12)
+//                dx *= -1;
 
-           if (fabs(dx) <= da)
-           {
-               currentRA = targetRA;
-               nlocked++;
-           }
-           else if (dx > 0)
-               currentRA += da / 15.;
-           else
-               currentRA -= da / 15.;
+//            if (fabs(dx) <= da)
+//            {
+//                currentRA = targetRA;
+//                nlocked++;
+//            }
+//            else if (dx > 0)
+//                currentRA += da / 15.;
+//            else
+//                currentRA -= da / 15.;
 
-           if (currentRA < 0)
-               currentRA += 24;
-           else if (currentRA > 24)
-               currentRA -= 24;
+//            if (currentRA < 0)
+//                currentRA += 24;
+//            else if (currentRA > 24)
+//                currentRA -= 24;
 
-           dx = targetDEC - currentDEC;
-           if (fabs(dx) <= da)
-           {
-               currentDEC = targetDEC;
-               nlocked++;
-           }
-           else if (dx > 0)
-               currentDEC += da;
-           else
-               currentDEC -= da;
+//            dx = targetDEC - currentDEC;
+//            if (fabs(dx) <= da)
+//            {
+//                currentDEC = targetDEC;
+//                nlocked++;
+//            }
+//            else if (dx > 0)
+//                currentDEC += da;
+//            else
+//                currentDEC -= da;
 
-           if (nlocked == 2)
-           {
-               if (TrackState == SCOPE_SLEWING)
-                   driver->setSimSytemStatus(ST_TRACKING_PEC_OFF);
-               else
-                   driver->setSimSytemStatus(ST_PARKED);
-           }
+//            if (nlocked == 2)
+//            {
+//                if (TrackState == SCOPE_SLEWING)
+//                    set_sim_system_status(ST_TRACKING_PEC_OFF);
+//                else
+//                    set_sim_system_status(ST_PARKED);
+//            }
 
-           break;
+//            break;
 
-       default:
-           break;
-   }
+//        default:
+//            break;
+//    }
 
-   driver->setSimRA(currentRA);
-   driver->setSimDE(currentDEC);
-}
+//    set_sim_ra(currentRA);
+//    set_sim_dec(currentDEC);
+//}
 
 bool IEQPro::SetCurrentPark()
 {
@@ -1385,7 +1020,7 @@ bool IEQPro::SetCurrentPark()
 
 bool IEQPro::SetDefaultPark()
 {
-    // By defualt azimuth 0
+    // By default azimuth 0
     SetAxis1Park(0);
 
     // Altitude = latitude of observer
