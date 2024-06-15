@@ -33,7 +33,6 @@ class IEQPro : public INDI::Telescope, public INDI::GuiderInterface
 
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
         virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
-        virtual bool ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n) override;
 
     protected:
         virtual const char *getDefaultName() override;
@@ -80,7 +79,7 @@ class IEQPro : public INDI::Telescope, public INDI::GuiderInterface
         virtual bool SetSlewRate(int index) override;
 
         // Sim
-        void mountSim();
+        //void mountSim();
 
         // Guide
         virtual IPState GuideNorth(uint32_t ms) override;
@@ -93,30 +92,6 @@ class IEQPro : public INDI::Telescope, public INDI::GuiderInterface
             * @brief getStartupData Get initial mount info on startup.
             */
         void getStartupData();
-
-        /* Mod v3.0 Adding PEC Recording Switches  */
-        ISwitchVectorProperty PECTrainingSP; 
-        ITextVectorProperty PECInfoTP;
-        ITextVectorProperty PECFileTP;
-        INumberVectorProperty PECTimingNP;
-        ISwitch PECTrainingS[2]; 
-        IText PECInfoT[1] {};
-        IText PECFileT[3] {};
-        INumber PECTimingN[3] {};
-        
-        char PECText[128];
-        char PECFullPath[256];
-        float* PECvalues;
-        tm PECStart_tm;
-        std::time_t PECStartTime;
-        std::ifstream PECfile;
-        int PECIndex = 0;
-        bool isTraining = false;
-        bool isWaitingTraining = false;
-        float appliedCorrection = 0;
-        
-        int elapsed_training = 0; // seconds
-        // End Mod */
 
         /* Firmware */
         IText FirmwareT[5] {};
